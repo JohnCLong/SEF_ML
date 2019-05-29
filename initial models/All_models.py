@@ -46,18 +46,25 @@ loss_of_load_probability.sort_index(inplace=True)
 market_index_data.sort_index(inplace=True)
 wind_generation_forecast_and_outturn.sort_index(inplace=True)
 
-# combine the solar, wind off, wind on into one column describing the renewable genreaiton forecast
+# combine the solar, wind off, wind on into one column describing the renewable generation forecast
 renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
     renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off'] +
-    renewable_generation_forecast.loc[:, 'wind_on']
-)
+    renewable_generation_forecast.loc[:, 'wind_on'])
 
 # locate the relevant wind data, then calculate the difference between them
-# the wind forcaste data is hourly so fill forward to fill NaN values.
+# the wind forecast data is hourly so fill forward to fill NaN values.
 wind_forecast = wind_generation_forecast_and_outturn.loc[:, ['initialWindForecast', 'latestWindForecast',
                                                              'windOutturn']]
+
+# new attributes
 wind_forecast['Val_Diff'] = wind_forecast['initialWindForecast'] - wind_forecast['latestWindForecast']
 wind_forecast.fillna(method='ffill', inplace=True)
+
+# combine the solar, wind off, wind on into one column describing the renewable generation forecast
+renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
+    renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off'] +
+    renewable_generation_forecast.loc[:, 'wind_on'])
+
 
 # define the features needed to train the model
 NIV = derived_system_wide_data.loc[:, 'indicativeNetImbalanceVolume']
@@ -69,26 +76,33 @@ forecast_generation = generation_day_ahead.loc[:, 'quantity']
 df = pd.concat([NIV, generation_per_type, apx_price, renewable_generation_forecast, forecast_demand,
                 generation_day_ahead, initial_demand_outturn, interconnectors, loss_of_load_probability,
                 market_index_data, wind_forecast, ], axis=1, sort=True)
-# df = pd.concat([NIV, forecast_renewables, forecast_demand, forecast_generation, wind_forecast], axis=1, sort=True)
+
+# drop the column intenemgeneration as it is NAN
 df = df.drop("intnemGeneration", axis=1)
 df.dropna(inplace=True)
 
-# Get names of indexes for which column generation has value less thatn 10GW and drop
+# Get names of indexes for which column generation has value less than 10GW and drop
+# Question for A & J: as the data is chronological, can you drop rows or does that create new relationships.
 indexNames = df[df['quantity'] < 10000].index
 df.drop(indexNames, inplace=True)
 df = df.rename({'indicativeNetImbalanceVolume': 'NIV', 'quantity': 'Generation'}, axis='columns')
 
 # cols = ['RenewablePrediction', 'TSDF', 'Generation', 'initialWindForecast', 'latestWindForecast']
+# after investigating the data these were the catagories with the largest corrolation to NIV
 cols_all = ['Biomass', 'HydroPumpedStorage', 'Other', 'Solar', 'solar', 'wind_off', 'APXPrice', 'initialWindForecast']
 
-# take data fomr 2018 onwards to reduce training time, then split data chronologically.
+# take data from 2018 onwards to reduce training time, then split data chronologically.
+# Question for A & J: when you split the data, you should do this before you investigate relationships, and before you
+#                     it should be kept in chronological order.
 df = df.loc[df.index > 2018000000, :]
 train = df.loc[df.index < 2018090000, :]
 validate = df.loc[df.index > 2018090000, :]
 
-# create x data and then normalize it by subtracting the mean and dividing by the standard deviation.
+# create X data and then standardise it by subtracting the mean and dividing by the standard deviation.
 X_train = train.loc[:, cols_all]
-X_norm = 100*(X_train-X_train.mean())/X_train.std()
+X_train_mean = X_train.mean()
+X_train_std = X_train.std()
+X_norm = 100 * (X_train - X_train_mean) / X_train_std
 
 
 y_train = train.loc[:, 'NIV']
