@@ -2,8 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas.plotting import scatter_matrix
-from sklearn.linear_model import LinearRegression, ElasticNet
-from sklearn.metrics import mean_squared_error
+
 
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -47,7 +46,7 @@ loss_of_load_probability.sort_index(inplace=True)
 market_index_data.sort_index(inplace=True)
 wind_generation_forecast_and_outturn.sort_index(inplace=True)
 
-# combine the solar, wind off, wind on into one column describing the renewable genreaiton forecast
+# combine the solar, wind off, wind on into one column describing the renewable generation forecast
 renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
     renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off']+
     renewable_generation_forecast.loc[:, 'wind_on']
@@ -65,8 +64,8 @@ forecast_generation = generation_day_ahead.loc[:, 'quantity']
 
 # combine all features into one data frame
 data = pd.concat([NIV, generation_per_type, apx_price, renewable_generation_forecast, forecast_demand,
-                   generation_day_ahead, initial_demand_outturn, interconnectors, loss_of_load_probability,
-                   market_index_data, wind_forecast, ], axis=1, sort=True)
+                  generation_day_ahead, initial_demand_outturn, interconnectors, loss_of_load_probability,
+                  market_index_data, wind_forecast, ], axis=1, sort=True)
 alldf = pd.concat([NIV, forecast_renewables, forecast_demand, forecast_generation, wind_forecast], axis=1, sort=True)
 df = data.copy()
 df = df.drop("intnemGeneration", axis=1)
@@ -75,16 +74,17 @@ df.dropna(inplace=True)
 
 df = df.loc[:,~df.columns.duplicated()]
 
-def rename_duplicate_columns(data, duplicate):
+
+def rename_duplicate_columns(data_frame, duplicate):
     cols = []
     count = 1
-    for column in data.columns:
+    for column in data_frame.columns:
         if column == duplicate:
             cols.append(duplicate+np.str(count))
             count += 1
             continue
     cols.append(column)
-    data.columns = cols
+    data_frame.columns = cols
     return
 
 

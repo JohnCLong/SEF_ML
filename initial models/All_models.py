@@ -211,22 +211,26 @@ print("Random Forest model RME = " + str(round(np.mean(random_forest_rmse_scores
 days = np.arange(len(y_ela_prediction))/48
 max_days = 5*48
 
-# plot data on one graph.
-plt.figure(figsize=(18, 10))
-plt.plot(days[:max_days], y_static_pred[:max_days],  color='m', linewidth=2, linestyle='solid', label="Static")
-plt.plot(days[:max_days], y_ela_prediction[:max_days],  color='b', linewidth=2, linestyle='solid',
-         label="Elastic Net")
-plt.plot(days[:max_days], y_lin_prediction[:max_days],  color='y', linewidth=2, linestyle='solid',
-         label="Linear Regression")
-plt.plot(days[:max_days], y_lass_prediction[:max_days],  color='g', linewidth=2, linestyle='solid', label="LASSO")
-plt.plot(days[:max_days], y_random_forest_prediction[:max_days],  color='c', linewidth=2, linestyle='solid',
-         label="Random Forests")
-plt.plot(days[:max_days], y_validate.values[:max_days],  color='k', linewidth=2, linestyle='dashed',
-         label="Actual NIV")
+# Plot data on one graph.
+plt.rcParams["figure.figsize"] = (18,10)
+model = [y_static_pred, y_ela_prediction, y_lin_prediction, y_lass_prediction, y_random_forest_prediction, y_validate]
+name = ['Static', 'Elastic Net', 'Linear Regression', 'Random Forests', 'NIV']
+colour = ['m', 'b', 'y', 'g', 'c']
 
-
-plt.ylabel('NIV')
-plt.ylabel('Days')
+for y_data, c, l in zip(model, colour, name):
+    plt.plot(days[:max_days], y_data[:max_days], color=c, linewidth=2, linestyle='solid', label=l)
+plt.plot(days[:max_days], y_validate.values[:max_days], color='k', linewidth=2, linestyle='dashed')
 plt.title('All models: Comparison of First 100 Validation Values')
+plt.xlabel('Days')
+plt.ylabel('NIV')
 plt.legend()
 plt.show()
+
+# Plot data on separate graphs
+for y_data, l in zip(model, name):
+    plt.plot(days[:max_days], y_validate.values[:max_days], color='k', linewidth=2, linestyle='dashed')
+    plt.plot(days[:max_days], y_data[:max_days], color='b')
+    plt.xlabel('Days')
+    plt.ylabel('NIV')
+    plt.title(l)
+    plt.show()
