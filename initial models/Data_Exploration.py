@@ -99,11 +99,11 @@ cm_NIV = correlation_matrix['NIV']
 cm_NIV = cm_NIV.reindex(cm_NIV.abs().sort_values(ascending=False).index)
 # create a new list of the two 5 most correlated values (starting at 1 as list_of_attributes[0] = 'NIV'
 list_of_rows = cm_NIV.index.values
-attributes = list_of_rows[1:6]
+attributes = list_of_rows[0:6]
 
 df[attributes].hist(bins=50, figsize=(20, 15))
 plt.show()
 
-scatter_matrix(df[attributes], figsize=(20, 18))
+scatter_matrix(df[attributes], figsize=(40, 30), diagonal='kde')
 plt.show()
 
