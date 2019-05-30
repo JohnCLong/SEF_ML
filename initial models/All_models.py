@@ -105,9 +105,9 @@ cols_all = ['Biomass', 'HydroPumpedStorage', 'Other', 'Solar', 'solar', 'wind_of
 # Take data from 2018 onwards to reduce training time, then split data chronologically.
 # TODO: Question for A & J: when you split the data, you should do this before you investigate relationships, and
 #                     before you split the data should be kept in chronological order.
-df = df.loc[df.index > 2018000000, :]
-train = df.loc[df.index < 2018090000, :]
-validate = df.loc[df.index > 2018090000, :]
+df = df.loc[df.index > 2016000000, :]
+train = df.loc[df.index < 2018030000, :]
+validate = df.loc[df.index > 2018030000, :]
 
 # Create X data and then standardise it by subtracting the mean and dividing by the standard deviation.
 X_train = train.loc[:, cols_all]
@@ -214,10 +214,10 @@ max_days = 5*48
 # Plot data on one graph.
 plt.rcParams["figure.figsize"] = (18,10)
 model = [y_static_pred, y_ela_prediction, y_lin_prediction, y_lass_prediction, y_random_forest_prediction, y_validate]
-name = ['Static', 'Elastic Net', 'Linear Regression', 'Random Forests', 'NIV']
+name = ['Static', 'Elastic Net', 'Linear Regression', 'Lasso', 'Random Forests', 'NIV']
 colour = ['m', 'b', 'y', 'g', 'c']
 
-for y_data, c, l in zip(model, colour, name):
+for y_data, c, l in zip(model[:-1], colour, name[:-1]):
     plt.plot(days[:max_days], y_data[:max_days], color=c, linewidth=2, linestyle='solid', label=l)
 plt.plot(days[:max_days], y_validate.values[:max_days], color='k', linewidth=2, linestyle='dashed')
 plt.title('All models: Comparison of First 100 Validation Values')
