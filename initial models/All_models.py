@@ -48,59 +48,68 @@ loss_of_load_probability.sort_index(inplace=True)
 market_index_data.sort_index(inplace=True)
 wind_generation_forecast_and_outturn.sort_index(inplace=True)
 
-# combine the solar, wind off, wind on into one column describing the renewable generation forecast
-renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
-    renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off'] +
-    renewable_generation_forecast.loc[:, 'wind_on'])
+# ---------------------------------------------------------------------
+# Data Pre-processing
+# function to sum columns
 
-# locate the relevant wind data, then calculate the difference between them
+
+def sum_columns(df, columns):
+    return df.loc[:, columns].sum(axis=1)
+
+
+def subtract_columns(df,a,b):
+    return df[a] - df[b]
+
+
+# Sum all the renewables
+renewables_forcast = ['solar', 'wind_off', 'wind_on']
+renewable_generation_forecast.loc[:, 'RenewablePrediction'] = sum_columns(renewable_generation_forecast, renewables_forcast)
+
+
+# Locate the relevant wind data, then calculate the difference between them
 # the wind forecast data is hourly so fill forward to fill NaN values.
 wind_forecast = wind_generation_forecast_and_outturn.loc[:, ['initialWindForecast', 'latestWindForecast',
                                                              'windOutturn']]
 
-# new attributes
-wind_forecast['Val_Diff'] = wind_forecast['initialWindForecast'] - wind_forecast['latestWindForecast']
+# New attributes
+wind_forecast['Val_Diff'] = subtract_columns(wind_forecast, 'initialWindForecast', 'latestWindForecast')
 wind_forecast.fillna(method='ffill', inplace=True)
 
-# combine the solar, wind off, wind on into one column describing the renewable generation forecast
-renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
-    renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off'] +
-    renewable_generation_forecast.loc[:, 'wind_on'])
-
-
-# define the features needed to train the model
+# Define the features needed to train the model
 NIV = derived_system_wide_data.loc[:, 'indicativeNetImbalanceVolume']
 forecast_renewables = renewable_generation_forecast.loc[:, 'RenewablePrediction']
 forecast_demand = forecast_demand.loc[:, 'TSDF']
 forecast_generation = generation_day_ahead.loc[:, 'quantity']
 
-# combine all features into one data frame
+# Combine all features into one data frame
 df = pd.concat([NIV, generation_per_type, apx_price, renewable_generation_forecast, forecast_demand,
                 generation_day_ahead, initial_demand_outturn, interconnectors, loss_of_load_probability,
                 market_index_data, wind_forecast, ], axis=1, sort=True)
 
-# drop the column intenemgeneration as it is NAN
+# Drop the column intenemgeneration as it is NAN
 df = df.drop("intnemGeneration", axis=1)
 df.dropna(inplace=True)
 
 # Get names of indexes for which column generation has value less than 10GW and drop
-# Question for A & J: as the data is chronological, can you drop rows or does that create new relationships.
+# TODO: Question for A & J: as the data is chronological, can you drop rows or does that create new relationships.
 indexNames = df[df['quantity'] < 10000].index
 df.drop(indexNames, inplace=True)
 df = df.rename({'indicativeNetImbalanceVolume': 'NIV', 'quantity': 'Generation'}, axis='columns')
 
-# cols = ['RenewablePrediction', 'TSDF', 'Generation', 'initialWindForecast', 'latestWindForecast']
-# after investigating the data these were the catagories with the largest corrolation to NIV
+# After investigating the data these were the categories with the largest correlation to NIV
+#           --------------
+#           cols = ['RenewablePrediction', 'TSDF', 'Generation', 'initialWindForecast', 'latestWindForecast']
+#           --------------
 cols_all = ['Biomass', 'HydroPumpedStorage', 'Other', 'Solar', 'solar', 'wind_off', 'APXPrice', 'initialWindForecast']
 
-# take data from 2018 onwards to reduce training time, then split data chronologically.
-# Question for A & J: when you split the data, you should do this before you investigate relationships, and before you
-#                     it should be kept in chronological order.
+# Take data from 2018 onwards to reduce training time, then split data chronologically.
+# TODO: Question for A & J: when you split the data, you should do this before you investigate relationships, and
+#                     before you split the data should be kept in chronological order.
 df = df.loc[df.index > 2018000000, :]
 train = df.loc[df.index < 2018090000, :]
 validate = df.loc[df.index > 2018090000, :]
 
-# create X data and then standardise it by subtracting the mean and dividing by the standard deviation.
+# Create X data and then standardise it by subtracting the mean and dividing by the standard deviation.
 X_train = train.loc[:, cols_all]
 X_train_mean = X_train.mean()
 X_train_std = X_train.std()
@@ -109,13 +118,15 @@ X_norm = 100 * (X_train - X_train_mean) / X_train_std
 
 y_train = train.loc[:, 'NIV']
 
-# normalize the validation data and separate into x and y variables data frames.
+# Normalize the validation data and separate into x and y variables data frames.
 X_validate = validate.loc[:, cols_all]
 X_norm_validate = 100*(X_validate-X_validate.mean())/X_validate.std()
 
 y_validate = validate.loc[:, 'NIV']
 
-# train each sklearn model
+# --------------------------------------------------------------------------------------
+# Model Training
+# Train each sklearn model
 lin = LinearRegression()
 lin.fit(X_norm, y_train)
 
@@ -128,7 +139,7 @@ lass.fit(X_norm, y_train)
 forest_reg = RandomForestRegressor(n_estimators=10, random_state=42)
 forest_reg.fit(X_norm, y_train)
 
-# calculate the predictions from each model.
+# Calculate the predictions from each model.
 y_lin_prediction = lin.predict(X_norm_validate)
 lin_mse = mean_squared_error(y_validate, y_lin_prediction)
 lin_rme = np.sqrt(lin_mse)
@@ -146,7 +157,7 @@ y_random_forest_prediction = forest_reg.predict(X_norm_validate)
 random_forest_mse = mean_squared_error(y_validate, y_lass_prediction)
 random_forest_rme = np.sqrt(lass_mse)
 
-# static model input for how many periods the data should be shifted and then shift data.
+# Static model input for how many periods the data should be shifted and then shift data.
 
 
 def static_model(data, steps):
@@ -155,17 +166,17 @@ def static_model(data, steps):
     return prediction
 
 
-#periods = input("How many settlement periods ahead do you want to predict?: ")
+# Periods = input("How many settlement periods ahead do you want to predict?: ")
 periods = 3
 static_pred = static_model(y_validate, periods)
 
-# fill any NaN with 0 and calcualte rme
+# Fill any NaN with 0 and calcualte rme
 y_static_pred = static_pred.fillna(0).values
 static_mse = mean_squared_error(y_validate, y_static_pred)
 static_rmse = np.sqrt(static_mse)
 
 
-# cross validation
+# Cross validation
 def display_scores(scores):
     print()
     print("Scores:", scores)
