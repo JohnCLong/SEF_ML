@@ -99,11 +99,19 @@ cm_NIV = correlation_matrix['NIV']
 cm_NIV = cm_NIV.reindex(cm_NIV.abs().sort_values(ascending=False).index)
 # create a new list of the two 5 most correlated values (starting at 1 as list_of_attributes[0] = 'NIV'
 list_of_rows = cm_NIV.index.values
-attributes = list_of_rows[0:6]
+features = list_of_rows[0:10]
 
-df[attributes].hist(bins=50, figsize=(20, 15))
+df[features].hist(bins=50, figsize=(20, 15))
 plt.show()
 
-scatter_matrix(df[attributes], figsize=(40, 30), diagonal='kde')
+scatter_matrix(df[features[0:4]], figsize=(40, 30), diagonal='kde')
 plt.show()
+
+for xcol in features[1:]:
+    df.plot(kind='scatter', x=xcol, y='NIV', alpha=0.5, color='b', figsize=(20, 15))
+    plt.show()
+
+correlation_features = df[features].corr()
+print(correlation_features)
+
 
