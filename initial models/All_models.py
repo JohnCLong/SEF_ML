@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression, ElasticNet, Lasso
 from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestRegressor
 
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -116,10 +118,15 @@ y_validate = validate.loc[:, 'NIV']
 # train each sklearn model
 lin = LinearRegression()
 lin.fit(X_norm, y_train)
+
 ela = ElasticNet(alpha=500)
 ela.fit(X_norm, y_train)
+
 lass = Lasso(alpha=500)
 lass.fit(X_norm, y_train)
+
+forest_reg = RandomForestRegressor(n_estimators=10, random_state=42)
+forest_reg.fit(X_norm, y_train)
 
 # calculate the predictions from each model.
 y_lin_prediction = lin.predict(X_norm_validate)
@@ -135,20 +142,59 @@ y_lass_prediction = lass.predict(X_norm_validate)
 lass_mse = mean_squared_error(y_validate, y_lass_prediction)
 lass_rme = np.sqrt(lass_mse)
 
+y_random_forest_prediction = forest_reg.predict(X_norm_validate)
+random_forest_mse = mean_squared_error(y_validate, y_lass_prediction)
+random_forest_rme = np.sqrt(lass_mse)
+
 # static model input for how many periods the data should be shifted and then shift data.
-periods = input("How many settlement periods ahead do you want to predict?: ")
-static_train = y_validate.copy()
-static_pred = static_train.shift(periods=int(periods))
+
+
+def static_model(data, steps):
+    prediction = data.copy()
+    prediction = prediction.shift(periods=int(steps))
+    return prediction
+
+
+#periods = input("How many settlement periods ahead do you want to predict?: ")
+periods = 3
+static_pred = static_model(y_validate, periods)
 
 # fill any NaN with 0 and calcualte rme
 y_static_pred = static_pred.fillna(0).values
-static_mse = mean_squared_error(static_train, y_static_pred)
-static_rme = np.sqrt(static_mse)
+static_mse = mean_squared_error(y_validate, y_static_pred)
+static_rmse = np.sqrt(static_mse)
 
-print("Static model RME = " + str(round(static_rme, 2)) + 'MWh')
-print("Lasso model RME = " + str(round(lass_rme, 2)) + 'MWh')
-print("Elastic Net model RME = " + str(round(ela_rme, 2)) + 'MWh')
-print("Linear Regression model RME = " + str(round(lin_rme, 2)) + 'MWh')
+
+# cross validation
+def display_scores(scores):
+    print()
+    print("Scores:", scores)
+    print("Mean:", scores.mean())
+    print("Standard deviation:", scores.std())
+
+
+lin_scores = cross_val_score(lin, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+lin_rmse_scores = np.sqrt(-lin_scores)
+display_scores(lin_rmse_scores)
+
+lass_scores = cross_val_score(lass, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+lass_rmse_scores = np.sqrt(-lass_scores)
+display_scores(lass_rmse_scores)
+
+ela_scores = cross_val_score(ela, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+ela_rmse_scores = np.sqrt(-ela_scores)
+display_scores(ela_rmse_scores)
+
+random_forest_scores = cross_val_score(forest_reg, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+random_forest_rmse_scores = np.sqrt(-random_forest_scores)
+display_scores(random_forest_rmse_scores)
+
+print()
+print("Static model RME = " + str(round(static_rmse, 2)) + 'MWh')
+print("Lasso model RME = " + str(round(np.mean(lass_rmse_scores), 2)) + 'MWh')
+print("Elastic Net model RME = " + str(round(np.mean(ela_rmse_scores), 2)) + 'MWh')
+print("Linear Regression model RME = " + str(round(np.mean(lin_rmse_scores), 2)) + 'MWh')
+print("Random Forest model RME = " + str(round(np.mean(random_forest_rmse_scores), 2)) + 'MWh')
 
 # convert periods to days
 days = np.arange(len(y_ela_prediction))/48
@@ -156,12 +202,18 @@ max_days = 5*48
 
 # plot data on one graph.
 plt.figure(figsize=(18, 10))
-plt.plot(days[:max_days], y_static_pred[:max_days],  color='maroon', linewidth=2, linestyle='solid', label="Static Model")
-plt.plot(days[:max_days], y_ela_prediction[:max_days],  color='blue', linewidth=2, linestyle='solid', label="Elastic Net")
-plt.plot(days[:max_days], y_lin_prediction[:max_days],  color='orange', linewidth=2, linestyle='solid',
+plt.plot(days[:max_days], y_static_pred[:max_days],  color='m', linewidth=2, linestyle='solid', label="Static")
+plt.plot(days[:max_days], y_ela_prediction[:max_days],  color='b', linewidth=2, linestyle='solid',
+         label="Elastic Net")
+plt.plot(days[:max_days], y_lin_prediction[:max_days],  color='y', linewidth=2, linestyle='solid',
          label="Linear Regression")
-plt.plot(days[:max_days], y_lass_prediction[:max_days],  color='green', linewidth=2, linestyle='solid', label="LASSO")
-plt.plot(days[:max_days], y_validate.values[:max_days],  color='black', linewidth=2, linestyle='dashed', label="Actual NIV")
+plt.plot(days[:max_days], y_lass_prediction[:max_days],  color='g', linewidth=2, linestyle='solid', label="LASSO")
+plt.plot(days[:max_days], y_random_forest_prediction[:max_days],  color='c', linewidth=2, linestyle='solid',
+         label="Random Forests")
+plt.plot(days[:max_days], y_validate.values[:max_days],  color='k', linewidth=2, linestyle='dashed',
+         label="Actual NIV")
+
+
 plt.ylabel('NIV')
 plt.ylabel('Days')
 plt.title('All models: Comparison of First 100 Validation Values')
