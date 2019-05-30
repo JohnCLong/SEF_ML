@@ -107,5 +107,3 @@ plt.show()
 scatter_matrix(df[attributes], figsize=(20, 18))
 plt.show()
 
-
-scatter_matrix(df)
