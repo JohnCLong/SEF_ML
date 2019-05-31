@@ -3,7 +3,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pandas.plotting import scatter_matrix
 
+# ----------------------------------------------------------------------------------------------------------------------
 
+
+def rename_duplicate_columns(data_frame, duplicate):
+    cols = []
+    count = 1
+    for column in data_frame.columns:
+        if column == duplicate:
+            cols.append(duplicate+np.str(count))
+            count += 1
+            continue
+    cols.append(column)
+    data_frame.columns = cols
+    return
+
+
+def plot_scatter(data_frame, x_name, y_name):
+    data_frame.plot(kind='scatter', x=x_name, y=y_name, alpha=0.5, color='b', figsize=(18, 15))
+    plt.title(y_name + ' vs ' + xcol)
+    #    plt.savefig('pictures/Data Exploration/' + x_name + 'vs' + y_name '.png')
+    plt.show()
+    return
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
 apx_price = pd.read_csv('SEF-ML/data/apx_day_ahead.csv')
@@ -46,13 +70,14 @@ loss_of_load_probability.sort_index(inplace=True)
 market_index_data.sort_index(inplace=True)
 wind_generation_forecast_and_outturn.sort_index(inplace=True)
 
+# ----------------------------------------------------------------------------------------------------------------------
 # combine the solar, wind off, wind on into one column describing the renewable generation forecast
 renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
-    renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off']+
-    renewable_generation_forecast.loc[:, 'wind_on']
-)
+    renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off'] +
+    renewable_generation_forecast.loc[:, 'wind_on'])
 
-wind_forecast = wind_generation_forecast_and_outturn.loc[:, ['initialWindForecast', 'latestWindForecast', 'windOutturn']]
+wind_forecast = wind_generation_forecast_and_outturn.loc[:, ['initialWindForecast', 'latestWindForecast',
+                                                             'windOutturn']]
 wind_forecast['Val_Diff'] = wind_forecast['initialWindForecast'] - wind_forecast['latestWindForecast']
 wind_forecast.fillna(method='ffill', inplace=True)
 
@@ -65,34 +90,20 @@ forecast_generation = generation_day_ahead.loc[:, 'quantity']
 # combine all features into one data frame
 data = pd.concat([NIV, generation_per_type, apx_price, renewable_generation_forecast, forecast_demand,
                   generation_day_ahead, initial_demand_outturn, interconnectors, loss_of_load_probability,
-                  market_index_data, wind_forecast, ], axis=1, sort=True)
-alldf = pd.concat([NIV, forecast_renewables, forecast_demand, forecast_generation, wind_forecast], axis=1, sort=True)
+                  market_index_data, wind_forecast], axis=1, sort=True)
 df = data.copy()
 df = df.drop("intnemGeneration", axis=1)
 df.drop('settlementDate', axis=1)
 df.dropna(inplace=True)
 
-df = df.loc[:,~df.columns.duplicated()]
-
-
-def rename_duplicate_columns(data_frame, duplicate):
-    cols = []
-    count = 1
-    for column in data_frame.columns:
-        if column == duplicate:
-            cols.append(duplicate+np.str(count))
-            count += 1
-            continue
-    cols.append(column)
-    data_frame.columns = cols
-    return
-
+df = df.loc[:, ~df.columns.duplicated()]
 
 # Get names of indexes for which column generation has value less thatn 10GW and drop
 indexNames = df[df['quantity'] < 10000].index
 df.drop(indexNames, inplace=True)
 df = df.rename({'indicativeNetImbalanceVolume': 'NIV', 'quantity': 'Generation'}, axis='columns')
 
+# ----------------------------------------------------------------------------------------------------------------------
 # calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
 correlation_matrix = df.corr()
 cm_NIV = correlation_matrix['NIV']
@@ -101,17 +112,22 @@ cm_NIV = cm_NIV.reindex(cm_NIV.abs().sort_values(ascending=False).index)
 list_of_rows = cm_NIV.index.values
 features = list_of_rows[0:10]
 
-df[features].hist(bins=50, figsize=(20, 15))
-plt.show()
-
-scatter_matrix(df[features[0:4]], figsize=(40, 30), diagonal='kde')
-plt.show()
-
-for xcol in features[1:]:
-    df.plot(kind='scatter', x=xcol, y='NIV', alpha=0.5, color='b', figsize=(20, 15))
-    plt.show()
-
 correlation_features = df[features].corr()
 print(correlation_features)
 
+# ----------------------------------------------------------------------------------------------------------------------
+df[features].hist(bins=50, figsize=(20, 15))
+# plt.savefig('pictures/Data Exploration/Histogram.png')
+plt.show()
 
+scatter_matrix(df[features[0:4]], figsize=(20, 18), diagonal='kde')
+# plt.savefig('pictures/Data Exploration/Scatter_Matrix.png')
+plt.show()
+
+for xcol in features[1:]:
+    plot_scatter(df, xcol, 'NIV')
+
+plt.figure(figsize=(20, 15))
+plt.matshow(correlation_matrix)
+plt.yticks(range(len(correlation_matrix.columns)), correlation_matrix.columns)
+plt.show()
