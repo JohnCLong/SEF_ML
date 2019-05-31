@@ -28,6 +28,13 @@ def plot_scatter(data_frame, x_name, y_name):
     return
 
 
+def plot_line(plot_data, n, size):
+    plt.figure(figsize=size)
+    max_days = n*48
+    plt.plot(days[:max_days], plot_data[:max_days], color='k', linewidth=2)
+    plt.show()
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -72,6 +79,12 @@ market_index_data.sort_index(inplace=True)
 wind_generation_forecast_and_outturn.sort_index(inplace=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
+# todo: create the following features: porportion of [solare, wind] for total renewables/ porportion of renewables
+#  to toal generaion/ rate of change of wind/ previous periods NIV/
+
+# todo: Q for A & J: previous periods NIV, what would a realistic distance inot the past to look into be?, how to
+#  calculate the current volitilty of NIV, do you
+
 # combine the solar, wind off, wind on into one column describing the renewable generation forecast
 renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
     renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off'] +

@@ -209,10 +209,10 @@ print("Random Forest model RME = " + str(round(np.mean(random_forest_rmse_scores
 
 # convert periods to days
 days = np.arange(len(y_ela_prediction))/48
-max_days = 5*48
+max_days = 10*48
 
 # Plot data on one graph.
-plt.rcParams["figure.figsize"] = (18,10)
+plt.rcParams["figure.figsize"] = (30,10)
 model = [y_static_pred, y_ela_prediction, y_lin_prediction, y_lass_prediction, y_random_forest_prediction, y_validate]
 name = ['Static', 'Elastic Net', 'Linear Regression', 'Lasso', 'Random Forests', 'NIV']
 colour = ['m', 'b', 'y', 'g', 'c']
@@ -234,4 +234,3 @@ for y_data, l in zip(model, name):
     plt.ylabel('NIV')
     plt.title(l)
     plt.show()
-
