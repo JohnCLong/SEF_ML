@@ -234,3 +234,4 @@ for y_data, l in zip(model, name):
     plt.ylabel('NIV')
     plt.title(l)
     plt.show()
+
