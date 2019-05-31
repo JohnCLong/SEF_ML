@@ -21,8 +21,8 @@ def rename_duplicate_columns(data_frame, duplicate):
 
 def plot_scatter(data_frame, x_name, y_name):
     data_frame.plot(kind='scatter', x=x_name, y=y_name, alpha=0.5, color='b', figsize=(18, 15))
-    plt.title(y_name + ' vs ' + xcol)
-    # plt.savefig('pictures/Data Exploration/' + x_name + 'vs' + y_name + '.png')
+    plt.title(y_name + " vs "  + xcol)
+    # plt.savefig('pictures/Data Exploration/' + x_name + '_vs_' + y_name + '.png')
 
     plt.show()
     return
