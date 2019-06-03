@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression, ElasticNet, Lasso
+from sklearn.linear_model import ElasticNet
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score
 
@@ -125,12 +125,8 @@ y_validate = validate.loc[:, 'NIV']
 
 # ----------------------------------------------------------------------------------------------------------------------
 # train each sklearn model
-lin = LinearRegression()
-lin.fit(X_norm, y_train)
 ela = ElasticNet(alpha=500)
 ela.fit(X_norm, y_train)
-lass = Lasso(alpha=500)
-lass.fit(X_norm, y_train)
 
 # calculate the predictions from each model.
 y_ela_prediction = ela.predict(X_norm_validate)
