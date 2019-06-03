@@ -130,13 +130,13 @@ y_validate = validate.loc[:, 'NIV']
 lin = LinearRegression()
 lin.fit(X_norm, y_train)
 
-ela = ElasticNet(alpha=500)
+ela = ElasticNet(alpha=50)
 ela.fit(X_norm, y_train)
 
-lass = Lasso(alpha=500)
+lass = Lasso(alpha=50)
 lass.fit(X_norm, y_train)
 
-forest_reg = RandomForestRegressor(n_estimators=10, random_state=42)
+forest_reg = RandomForestRegressor(n_estimators=20, random_state=42)
 forest_reg.fit(X_norm, y_train)
 
 # Calculate the predictions from each model.
