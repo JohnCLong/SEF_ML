@@ -147,7 +147,8 @@ ela_scores = cross_val_score(ela, X_train, y_train, scoring="neg_mean_squared_er
 ela_rmse_scores = np.sqrt(-ela_scores)
 display_scores(ela_rmse_scores)
 
-# convert periods to days
+# ----------------------------------------------------------------------------------------------------------------------
+# plot data on graphs# convert periods to days
 days = np.arange(len(y_ela_prediction))/48
 max_days = 5*48
 

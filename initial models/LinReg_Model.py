@@ -148,11 +148,12 @@ lin_scores = cross_val_score(lin, X_train, y_train, scoring="neg_mean_squared_er
 lin_rmse_scores = np.sqrt(-lin_scores)
 display_scores(lin_rmse_scores)
 
+# ----------------------------------------------------------------------------------------------------------------------
+# plot data on one graph.
 # convert periods to days
 days = np.arange(len(y_lin_prediction))/48
 max_days = 5*48
 
-# plot data on one graph.
 plt.figure(figsize=(18, 10))
 plt.plot(days[:max_days], y_lin_prediction[:max_days],  color='orange', linewidth=2, linestyle='solid',
          label="Linear Regression")

@@ -147,6 +147,8 @@ lass_scores = cross_val_score(lass, X_train, y_train, scoring="neg_mean_squared_
 lass_rmse_scores = np.sqrt(-lass_scores)
 display_scores(lass_rmse_scores)
 
+# ----------------------------------------------------------------------------------------------------------------------
+# plot data on graphs
 # convert periods to days
 days = np.arange(len(y_lass_prediction))/48
 max_days = 5*48
