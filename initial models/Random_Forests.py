@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score
+from sklearn.externals import joblib
 
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -126,11 +128,62 @@ y_validate = validate.loc[:, 'NIV']
 
 # ----------------------------------------------------------------------------------------------------------------------
 # train each sklearn model
-forest_reg = RandomForestRegressor(n_estimators=20, random_state=42)
-forest_reg.fit(X_norm, y_train)
+rf = RandomForestRegressor(random_state = 42)
+
+# Number of trees in random forest
+n_estimators = [int(x) for x in np.linspace(start = 200, stop = 2000, num = 10)]
+# Number of features to consider at every split
+max_features = ['auto', 'sqrt']
+# Maximum number of levels in tree
+max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth.append(None)
+# Minimum number of samples required to split a node
+min_samples_split = [2, 5, 10]
+# Minimum number of samples required at each leaf node
+min_samples_leaf = [1, 2, 4]
+# Method of selecting samples for training each tree
+bootstrap = [True, False]
+# Create the random grid
+random_grid = {'n_estimators': n_estimators,
+               'max_features': max_features,
+               'max_depth': max_depth,
+               'min_samples_split': min_samples_split,
+               'min_samples_leaf': min_samples_leaf,
+               'bootstrap': bootstrap}
+
+# Use the random grid to search for best hyperparameters
+# First create the base model to tune
+rf = RandomForestRegressor()
+# Random search of parameters, using 3 fold cross validation,
+# search across 100 different combinations, and use all available cores
+rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=42, n_jobs = -1)
+# Fit the random search model
+rf_random.fit(X_norm, y_train)
+print(rf_random.best_params_)
+
+
+def evaluate(model, test_features, test_labels):
+    predictions = model.predict(test_features)
+    errors = abs(predictions - test_labels)
+    mape = 100 * np.mean(errors / abs(test_labels))
+    accuracy = 100 - mape
+    print('Model Performance')
+    print('Average Error: {:0.4f} degrees.'.format(np.mean(errors)))
+    print('Accuracy = {:0.2f}%.'.format(accuracy))
+    return accuracy
+
+
+base_model = RandomForestRegressor(n_estimators = 10, random_state = 42)
+base_model.fit(X_norm, y_train)
+base_accuracy = evaluate(base_model, X_validate, y_validate)
+
+best_random = rf_random.best_estimator_
+random_accuracy = evaluate(best_random, X_validate, y_validate)
+
+print('Improvement of {:0.2f}%.'.format( 100 * (random_accuracy - base_accuracy) / base_accuracy))
 
 # calculate the predictions from each model.
-y_random_forest_prediction = forest_reg.predict(X_norm_validate)
+y_random_forest_prediction = best_random.predict(X_norm_validate)
 random_forest_mse = mean_squared_error(y_validate, y_random_forest_prediction)
 random_forest_rme = np.sqrt(random_forest_mse)
 
@@ -144,7 +197,7 @@ def display_scores(scores):
     print("Standard deviation:", scores.std())
 
 
-random_forest_scores = cross_val_score(forest_reg, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
+random_forest_scores = cross_val_score(best_random, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
 random_forest_rmse_scores = np.sqrt(-random_forest_scores)
 display_scores(random_forest_rmse_scores)
 
