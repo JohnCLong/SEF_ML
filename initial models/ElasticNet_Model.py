@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import ElasticNetCV
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score
+import time
 
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -125,8 +126,30 @@ y_validate = validate.loc[:, 'NIV']
 
 # ----------------------------------------------------------------------------------------------------------------------
 # train each sklearn model
-ela = ElasticNet(alpha=500)
+ela = ElasticNetCV(cv=10)
 ela.fit(X_norm, y_train)
+
+t1 = time.time()
+ela.fit(X_norm, y_train)
+t_ela_cv = time.time() - t1
+
+elipson = 1e-4
+
+log_alphas = -np.log10(ela.alphas_ + elipson)
+
+plt.figure()
+plt.plot(log_alphas, ela.mse_path_, ':')
+plt.plot(log_alphas, ela.mse_path_.mean(axis=-1), 'k',
+         label='Average across the folds', linewidth=2)
+plt.axvline(-np.log10(ela.alpha_), linestyle='--', color='k',
+            label='alpha CV')
+plt.legend()
+
+plt.xlabel('-log(alpha)')
+plt.ylabel('Mean square error')
+plt.title('Mean square error on each fold: coordinate descent (train time: %.2fs)' % t_ela_cv)
+plt.axis('tight')
+plt.show()
 
 # calculate the predictions from each model.
 y_ela_prediction = ela.predict(X_norm_validate)
