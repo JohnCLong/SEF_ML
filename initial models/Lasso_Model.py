@@ -1,9 +1,12 @@
+import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import Lasso
+from sklearn.linear_model import LassoCV
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV
+# from sklearn.externals import joblib
 
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -125,16 +128,37 @@ y_validate = validate.loc[:, 'NIV']
 
 # ----------------------------------------------------------------------------------------------------------------------
 # train each sklearn model
-lass = Lasso(alpha=500)
+lass = LassoCV(cv=40)
+
+t1 = time.time()
 lass.fit(X_norm, y_train)
+t_lasso_cv = time.time() - t1
+
+elipson = 1e-4
+
+log_alphas = -np.log10(lass.alphas_ + elipson)
+
+plt.figure()
+plt.plot(log_alphas, lass.mse_path_, ':')
+plt.plot(log_alphas, lass.mse_path_.mean(axis=-1), 'k',
+         label='Average across the folds', linewidth=2)
+plt.axvline(-np.log10(lass.alpha_), linestyle='--', color='k',
+            label='alpha CV')
+plt.legend()
+
+plt.xlabel('-log(alpha)')
+plt.ylabel('Mean square error')
+plt.title('Mean square error on each fold: coordinate descent (train time: %.2fs)' % t_lasso_cv)
+plt.axis('tight')
+plt.show()
 
 # calculate the predictions from each model.
 y_lass_prediction = lass.predict(X_norm_validate)
 lass_mse = mean_squared_error(y_validate, y_lass_prediction)
 lass_rme = np.sqrt(lass_mse)
+plt.show()
 
 print("Lasso model RME = " + str(round(lass_rme, 2)) + 'MWh')
-
 
 def display_scores(scores):
     print()
@@ -146,6 +170,10 @@ def display_scores(scores):
 lass_scores = cross_val_score(lass, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
 lass_rmse_scores = np.sqrt(-lass_scores)
 display_scores(lass_rmse_scores)
+
+# save model
+# joblib.dump(lass, "lasso_model.pkl")
+# loaded_model = joblib.load("lasso_model.pkl")
 
 # ----------------------------------------------------------------------------------------------------------------------
 # plot data on graphs
