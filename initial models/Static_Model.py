@@ -11,7 +11,7 @@ NIV = derived_system_wide_data.loc[:, 'indicativeNetImbalanceVolume']
 NIV.fillna(method='ffill', inplace=True)
 
 # drop all values where generation is less than 10Gw (calulated in All_models.py
-indexNames= np.loadtxt('Low_Generaion_Index.csv', delimiter=',')
+indexNames = np.loadtxt('Low_Generaion_Index.csv', delimiter=',')
 NIV.drop(indexNames, axis=0, inplace=True)
 
 NIV = NIV.loc[NIV.index > 2018090000]
@@ -35,7 +35,8 @@ max_days = 5*48
 
 # plot data on one graph.
 plt.figure(figsize=(18, 10))
-plt.plot(days[:max_days], y_static_pred[:max_days],  color='maroon', linewidth=2, linestyle='solid', label="Static Model")
+plt.plot(days[:max_days], y_static_pred[:max_days],  color='maroon', linewidth=2, linestyle='solid',
+         label="Static Model")
 plt.plot(days[:max_days], NIV.values[:max_days],  color='black', linewidth=2, linestyle='dashed', label="Actual NIV")
 plt.ylabel('NIV')
 plt.ylabel('Days')

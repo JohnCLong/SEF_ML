@@ -56,13 +56,13 @@ def sum_columns(df, columns):
     return df.loc[:, columns].sum(axis=1)
 
 
-def subtract_columns(df,a,b):
+def subtract_columns(df, a, b):
     return df[a] - df[b]
 
 
 # Sum all the renewables
-renewables_forcast = ['solar', 'wind_off', 'wind_on']
-renewable_generation_forecast.loc[:, 'RenewablePrediction'] = sum_columns(renewable_generation_forecast, renewables_forcast)
+renewables_forcaste = ['solar', 'wind_off', 'wind_on']
+renewable_generation_forecast.loc[:, 'RenewablePrediction'] = sum_columns(renewable_generation_forecast, renewables_forcaste)
 
 
 # Locate the relevant wind data, then calculate the difference between them
@@ -154,8 +154,10 @@ max_days = 5*48
 
 # plot data on one graph.
 plt.figure(figsize=(18, 10))
-plt.plot(days[:max_days], y_ela_prediction[:max_days],  color='blue', linewidth=2, linestyle='solid', label="Elastic Net")
-plt.plot(days[:max_days], y_validate.values[:max_days],  color='black', linewidth=2, linestyle='dashed', label="Actual NIV")
+plt.plot(days[:max_days], y_ela_prediction[:max_days],  color='blue', linewidth=2, linestyle='solid',
+         label="Elastic Net")
+plt.plot(days[:max_days], y_validate.values[:max_days],  color='black', linewidth=2, linestyle='dashed',
+         label="Actual NIV")
 plt.ylabel('NIV')
 plt.ylabel('Days')
 plt.title('Elasic Net model: Comparison to NIV')

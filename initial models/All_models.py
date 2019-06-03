@@ -57,13 +57,14 @@ def sum_columns(df, columns):
     return df.loc[:, columns].sum(axis=1)
 
 
-def subtract_columns(df,a,b):
+def subtract_columns(df, a, b):
     return df[a] - df[b]
 
 
 # Sum all the renewables
-renewables_forcast = ['solar', 'wind_off', 'wind_on']
-renewable_generation_forecast.loc[:, 'RenewablePrediction'] = sum_columns(renewable_generation_forecast, renewables_forcast)
+renewables_forecast = ['solar', 'wind_off', 'wind_on']
+renewable_generation_forecast.loc[:, 'RenewablePrediction'] = sum_columns(renewable_generation_forecast,
+                                                                          renewables_forecast)
 
 
 # Locate the relevant wind data, then calculate the difference between them
@@ -154,8 +155,8 @@ lass_mse = mean_squared_error(y_validate, y_lass_prediction)
 lass_rme = np.sqrt(lass_mse)
 
 y_random_forest_prediction = forest_reg.predict(X_norm_validate)
-random_forest_mse = mean_squared_error(y_validate, y_lass_prediction)
-random_forest_rme = np.sqrt(lass_mse)
+random_forest_mse = mean_squared_error(y_validate, y_random_forest_prediction)
+random_forest_rme = np.sqrt(random_forest_mse)
 
 # Static model input for how many periods the data should be shifted and then shift data.
 
@@ -212,7 +213,7 @@ days = np.arange(len(y_ela_prediction))/48
 max_days = 10*48
 
 # Plot data on one graph.
-plt.rcParams["figure.figsize"] = (30,10)
+plt.rcParams["figure.figsize"] = (30, 10)
 model = [y_static_pred, y_ela_prediction, y_lin_prediction, y_lass_prediction, y_random_forest_prediction, y_validate]
 name = ['Static', 'Elastic Net', 'Linear Regression', 'Lasso', 'Random Forests', 'NIV']
 colour = ['m', 'b', 'y', 'g', 'c']

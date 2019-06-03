@@ -56,13 +56,13 @@ def sum_columns(df, columns):
     return df.loc[:, columns].sum(axis=1)
 
 
-def subtract_columns(df,a,b):
+def subtract_columns(df, a, b):
     return df[a] - df[b]
 
 
 # Sum all the renewables
-renewables_forcast = ['solar', 'wind_off', 'wind_on']
-renewable_generation_forecast.loc[:, 'RenewablePrediction'] = sum_columns(renewable_generation_forecast, renewables_forcast)
+renewables_forecast = ['solar', 'wind_off', 'wind_on']
+renewable_generation_forecast.loc[:, 'RenewablePrediction'] = sum_columns(renewable_generation_forecast, renewables_forecast)
 
 
 # Locate the relevant wind data, then calculate the difference between them
@@ -143,7 +143,6 @@ def display_scores(scores):
     print("Standard deviation:", scores.std())
 
 
-
 lin_scores = cross_val_score(lin, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
 lin_rmse_scores = np.sqrt(-lin_scores)
 display_scores(lin_rmse_scores)
@@ -157,7 +156,8 @@ max_days = 5*48
 plt.figure(figsize=(18, 10))
 plt.plot(days[:max_days], y_lin_prediction[:max_days],  color='orange', linewidth=2, linestyle='solid',
          label="Linear Regression")
-plt.plot(days[:max_days], y_validate.values[:max_days],  color='black', linewidth=2, linestyle='dashed', label="Actual NIV")
+plt.plot(days[:max_days], y_validate.values[:max_days],  color='black', linewidth=2, linestyle='dashed',
+         label="Actual NIV")
 plt.ylabel('NIV')
 plt.ylabel('Days')
 plt.title('Linear Regression Model: Comparison of First 100 Validation Values')
