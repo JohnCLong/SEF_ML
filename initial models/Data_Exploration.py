@@ -7,6 +7,7 @@ from pandas.plotting import scatter_matrix
 
 
 def rename_duplicate_columns(data_frame, duplicate):
+    global column
     cols = []
     count = 1
     for column in data_frame.columns:
@@ -21,7 +22,7 @@ def rename_duplicate_columns(data_frame, duplicate):
 
 def plot_scatter(data_frame, x_name, y_name):
     data_frame.plot(kind='scatter', x=x_name, y=y_name, alpha=0.5, color='b', figsize=(18, 15))
-    plt.title(y_name + " vs "  + xcol)
+    plt.title(y_name + " vs " + xcol)
     # plt.savefig('pictures/Data Exploration/' + x_name + '_vs_' + y_name + '.png')
 
     plt.show()
@@ -31,7 +32,7 @@ def plot_scatter(data_frame, x_name, y_name):
 def plot_line(plot_data, n, size):
     plt.figure(figsize=size)
     max_days = n*48
-    plt.plot(days[:max_days], plot_data[:max_days], color='k', linewidth=2)
+    plt.plot(n[:max_days], plot_data[:max_days], color='k', linewidth=2)
     plt.show()
 
 
