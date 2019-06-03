@@ -134,7 +134,7 @@ lin.fit(X_norm, y_train)
 ela = ElasticNet(alpha=50)
 ela.fit(X_norm, y_train)
 
-lass = Lasso(alpha=50)
+lass = Lasso(alpha=92.069)
 lass.fit(X_norm, y_train)
 
 forest_reg = RandomForestRegressor(n_estimators=20, random_state=42)
