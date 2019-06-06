@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pandas.plotting import scatter_matrix
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -12,7 +13,7 @@ def rename_duplicate_columns(data_frame, duplicate):
     count = 1
     for column in data_frame.columns:
         if column == duplicate:
-            cols.append(duplicate+np.str(count))
+            cols.append(duplicate + np.str(count))
             count += 1
             continue
     cols.append(column)
@@ -31,7 +32,7 @@ def plot_scatter(data_frame, x_name, y_name):
 
 def plot_line(plot_data, n, size):
     plt.figure(figsize=size)
-    max_days = n*48
+    max_days = n * 48
     plt.plot(n[:max_days], plot_data[:max_days], color='k', linewidth=2)
     plt.show()
 
@@ -85,38 +86,62 @@ wind_generation_forecast_and_outturn.sort_index(inplace=True)
 
 # todo: Q for A & J: previous periods NIV, what would a realistic distance inot the past to look into be?, how to
 #  calculate the current volitilty of NIV, do you
+raw_data = pd.concat([generation_per_type, apx_price, renewable_generation_forecast, forecast_demand,
+                      generation_day_ahead, derived_system_wide_data, forecast_day_and_day_ahead_demand_data,
+                      initial_demand_outturn, interconnectors, loss_of_load_probability,
+                      market_index_data, wind_generation_forecast_and_outturn], axis=1, sort=True)
 
-# combine the solar, wind off, wind on into one column describing the renewable generation forecast
-renewable_generation_forecast.loc[:, 'RenewablePrediction'] = (
-    renewable_generation_forecast.loc[:, 'solar']+renewable_generation_forecast.loc[:, 'wind_off'] +
-    renewable_generation_forecast.loc[:, 'wind_on'])
 
-wind_forecast = wind_generation_forecast_and_outturn.loc[:, ['initialWindForecast', 'latestWindForecast',
-                                                             'windOutturn']]
-wind_forecast['Val_Diff'] = wind_forecast['initialWindForecast'] - wind_forecast['latestWindForecast']
-wind_forecast.fillna(method='ffill', inplace=True)
+def preprocess_features(raw_data):
+    """Prepares input features from California housing data set.
 
-# define the features needed to train the model
-NIV = derived_system_wide_data.loc[:, 'indicativeNetImbalanceVolume']
-forecast_renewables = renewable_generation_forecast.loc[:, 'RenewablePrediction']
-forecast_demand = forecast_demand.loc[:, 'TSDF']
-forecast_generation = generation_day_ahead.loc[:, 'quantity']
+    Args:
+    whole_dataframe: A Pandas DataFrame expected to contain data
+      from the the "df".
+    Returns:
+    A DataFrame that contains the features to be used for the model, including
+    synthetic features.
+    """
 
-# combine all features into one data frame
-data = pd.concat([NIV, generation_per_type, apx_price, renewable_generation_forecast, forecast_demand,
-                  generation_day_ahead, initial_demand_outturn, interconnectors, loss_of_load_probability,
-                  market_index_data, wind_forecast], axis=1, sort=True)
-df = data.copy()
-df = df.drop("intnemGeneration", axis=1)
-df.drop('settlementDate', axis=1)
-df.dropna(inplace=True)
+    # Create a copy of the raw data and then drop all duplicates and label data.
+    processed_features = raw_data.copy()
+    processed_features = processed_features.loc[:, ~processed_features.columns.duplicated()]
 
-df = df.loc[:, ~df.columns.duplicated()]
+    # Drop unwanted data or fill if applicable
+    indexNames = processed_features[processed_features['quantity'] < 10000].index
+    processed_features.drop(indexNames, inplace=True)
+    processed_features.drop("intnemGeneration", axis=1, inplace=True)
+    processed_features.drop('settlementDate', axis=1, inplace=True)
+    processed_features.drop('systemSellPrice', axis=1, inplace=True)
+    processed_features['initialWindForecast'].fillna(method='ffill', inplace=True)
+    processed_features['latestWindForecast'].fillna(method='ffill', inplace=True)
+    processed_features['reserveScarcityPrice'].fillna(0, inplace=True)
+    processed_features['drm2HourForecast'].fillna(processed_features['drm2HourForecast'].mean(), inplace=True)
+    processed_features['lolp1HourForecast'].fillna(0, inplace=True)
 
-# Get names of indexes for which column generation has value less thatn 10GW and drop
-indexNames = df[df['quantity'] < 10000].index
-df.drop(indexNames, inplace=True)
-df = df.rename({'indicativeNetImbalanceVolume': 'NIV', 'quantity': 'Generation'}, axis='columns')
+    # Separate targets and features.
+    processed_target = processed_features.pop('indicativeNetImbalanceVolume')
+
+    # Create a synthetic features.
+    processed_features.loc[:, 'RenewablePrediction'] = (processed_features.loc[:, 'solar'] +
+                                                        processed_features.loc[:, 'wind_off'] +
+                                                        renewable_generation_forecast.loc[:, 'wind_on'])
+    processed_features['Val_Diff'] = processed_features['initialWindForecast'] \
+                                     - processed_features['latestWindForecast']
+
+    # Drop all NaN values, this drops
+    processed_features.dropna(inplace=True)
+
+    # Rename columns
+    processed_target = processed_target.rename("NIV")
+    processed_features.rename({'quantity': 'Generation', 'systemBuyPrice':'ImbalancePrice'}, axis='columns',
+                              inplace=True)
+
+    return processed_features, processed_target
+
+[processed_features, processed_targets] = preprocess_features(raw_data)
+NIV =pd.DataFrame(processed_targets)
+df = pd.concat([NIV, processed_features], axis=1, sort=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
