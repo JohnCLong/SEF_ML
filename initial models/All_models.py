@@ -99,7 +99,7 @@ def preprocess_features(raw_data):
     processed_features['Val_Diff'] = processed_features['initialWindForecast'] \
                                      - processed_features['latestWindForecast']
     processed_features['Solar_Frac'] = processed_features['solar'] / processed_features['quantity']
-    processed_features['Wind_Frac'] = (processed_features['wind_off'] + processed_features['wind_on'] )\
+    processed_features['Wind_Frac'] = (processed_features['wind_off'] + processed_features['wind_on'])\
                                       / processed_features['quantity']
     processed_features['Renewable_Frac'] = processed_features['RenewablePrediction'] / processed_features['quantity']
     processed_features.indicativeNetImbalanceVolume = processed_features.indicativeNetImbalanceVolume.shift(2)
@@ -134,7 +134,7 @@ processed_features['ImbalancePrice'] = clip(processed_features['ImbalancePrice']
 processed_features['FossilHardCoal'] = log_normalize(processed_features['FossilHardCoal'])
 processed_features['HydroPumpedStorage'] = log_normalize(processed_features['HydroPumpedStorage'])
 processed_features['HydroRunOfRiver'] = log_normalize(processed_features['HydroRunOfRiver'])
-processed_features['Solar'] = log_normalize(processed_features['Solar'])
+processed_features['solar'] = log_normalize(processed_features['solar'])
 processed_features['Other'] = log_normalize(processed_features['Other'])
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -150,8 +150,8 @@ X_validate_all = processed_features.loc[processed_features.index > 2018030000, :
 y_validate = processed_targets.loc[processed_targets.index > 2018030000]
 
 # Normalize the validation data and separate into X and y variables data frames.
-cols_all = ['Shift_NIV', 'ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice',
-       'Biomass', 'Other', 'wind_off', 'Solar', 'initialWindForecast']
+cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice',
+       'Biomass', 'Other', 'wind_off', 'initialWindForecast', 'Wind_Frac', 'Val_Diff', ]
 
 X_train = X_train_all.loc[:, cols_all]
 
