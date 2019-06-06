@@ -162,7 +162,7 @@ X_train = (X_train - X_train_mean) / X_train_std
 X_validate = X_validate_all.loc[:, cols_all]
 X_validate = (X_validate-X_train_mean)/X_train_std
 
-# --------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 # Model Training
 # Train each sklearn model
 lin = LinearRegression()
