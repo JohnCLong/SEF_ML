@@ -113,14 +113,18 @@ def preprocess_features(raw_data):
     processed_features.drop("intnemGeneration", axis=1, inplace=True)
     processed_features.drop('settlementDate', axis=1, inplace=True)
     processed_features.drop('systemSellPrice', axis=1, inplace=True)
+    processed_features.drop('sellPriceAdjustment', axis=1, inplace=True)
+    processed_features.drop('FossilOil', axis=1, inplace=True)
     processed_features['initialWindForecast'].fillna(method='ffill', inplace=True)
     processed_features['latestWindForecast'].fillna(method='ffill', inplace=True)
     processed_features['reserveScarcityPrice'].fillna(0, inplace=True)
     processed_features['drm2HourForecast'].fillna(processed_features['drm2HourForecast'].mean(), inplace=True)
     processed_features['lolp1HourForecast'].fillna(0, inplace=True)
 
+
+
     # Separate targets and features.
-    processed_target = processed_features.pop('indicativeNetImbalanceVolume')
+    processed_target = processed_features['indicativeNetImbalanceVolume'].copy()
 
     # Create a synthetic features.
     processed_features.loc[:, 'RenewablePrediction'] = (processed_features.loc[:, 'solar'] +
@@ -128,46 +132,69 @@ def preprocess_features(raw_data):
                                                         renewable_generation_forecast.loc[:, 'wind_on'])
     processed_features['Val_Diff'] = processed_features['initialWindForecast'] \
                                      - processed_features['latestWindForecast']
+    processed_features['Solar_Frac'] = processed_features['solar'] / processed_features['quantity']
+    processed_features['Wind_Frac'] = (processed_features['wind_off'] + processed_features['wind_on'] )\
+                                      / processed_features['quantity']
+    processed_features['Renewable_Frac'] = processed_features['RenewablePrediction'] / processed_features['quantity']
+
 
     # Drop all NaN values, this drops
     processed_features.dropna(inplace=True)
 
     # Rename columns
     processed_target = processed_target.rename("NIV")
-    processed_features.rename({'quantity': 'Generation', 'systemBuyPrice':'ImbalancePrice'}, axis='columns',
-                              inplace=True)
+    processed_features.rename({'quantity': 'Generation', 'systemBuyPrice': 'ImbalancePrice',
+                               'indicativeNetImbalanceVolume': 'NIV'}, axis='columns', inplace=True)
 
     return processed_features, processed_target
 
+
+def log_normalize(series):
+  return series.apply(lambda x: np.log(x+1.0))
+
+
+def clip(series, clip_to_min, clip_to_max):
+  return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
+
+
 [processed_features, processed_targets] = preprocess_features(raw_data)
-NIV =pd.DataFrame(processed_targets)
-df = pd.concat([NIV, processed_features], axis=1, sort=True)
+processed_features_copy = processed_features.copy()
+
+processed_features['APXPrice'] = clip(processed_features['APXPrice'], 0, 200)
+processed_features['Biomass'] = clip(processed_features['Biomass'], 0, 4000)
+processed_features['Nuclear'] = clip(processed_features['Nuclear'], 4000, 10000)
+processed_features['OffWind'] = clip(processed_features['OffWind'], 0, 5000)
+processed_features['OffWind'] = clip(processed_features['OffWind'], 0, 11000)
+processed_features['ImbalancePrice'] = clip(processed_features['ImbalancePrice'], -100, 250)
+
+processed_features['FossilHardCoal'] = log_normalize(processed_features['FossilHardCoal'])
+processed_features['HydroPumpedStorage'] = log_normalize(processed_features['HydroPumpedStorage'])
+processed_features['HydroRunOfRiver'] = log_normalize(processed_features['HydroRunOfRiver'])
+processed_features['Solar'] = log_normalize(processed_features['Solar'])
+processed_features['Other'] = log_normalize(processed_features['Other'])
 
 # ----------------------------------------------------------------------------------------------------------------------
 # calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
-correlation_matrix = df.corr()
+correlation_matrix = processed_features.corr()
 cm_NIV = correlation_matrix['NIV']
 cm_NIV = cm_NIV.reindex(cm_NIV.abs().sort_values(ascending=False).index)
 # create a new list of the two 5 most correlated values (starting at 1 as list_of_attributes[0] = 'NIV'
 list_of_rows = cm_NIV.index.values
 features = list_of_rows[0:10]
 
-correlation_features = df[features].corr()
+correlation_features = processed_features[features].corr()
 print(correlation_features)
 
 # ----------------------------------------------------------------------------------------------------------------------
-df[features].hist(bins=50, figsize=(20, 15))
+processed_features[features].hist(bins=50, figsize=(20, 15))
 # plt.savefig('pictures/Data Exploration/Histogram.png')
 plt.show()
 
-scatter_matrix(df[features[0:4]], figsize=(20, 18), diagonal='kde')
+scatter_matrix(processed_features[features[0:4]], figsize=(20, 18), diagonal='kde')
 # plt.savefig('pictures/Data Exploration/Scatter_Matrix.png')
 plt.show()
 
 for xcol in features[1:]:
-    plot_scatter(df, xcol, 'NIV')
+    plot_scatter(processed_features, xcol, 'NIV')
 
-plt.figure(figsize=(20, 15))
-plt.matshow(correlation_matrix)
-plt.yticks(range(len(correlation_matrix.columns)), correlation_matrix.columns)
-plt.show()
+
