@@ -5,7 +5,9 @@ from pandas.plotting import scatter_matrix
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-
+# TODO: Question for A & J: as the data is chronological, can you drop rows or does that create new relationships.
+# TODO: Question for A & J: when you split the data, you should do this before you investigate relationships, and
+#                     before you split the data should be kept in chronological order.
 
 def rename_duplicate_columns(data_frame, duplicate):
     global column
@@ -137,7 +139,6 @@ def preprocess_features(raw_data):
                                       / processed_features['quantity']
     processed_features['Renewable_Frac'] = processed_features['RenewablePrediction'] / processed_features['quantity']
 
-
     # Drop all NaN values, this drops
     processed_features.dropna(inplace=True)
 
@@ -147,6 +148,8 @@ def preprocess_features(raw_data):
                                'indicativeNetImbalanceVolume': 'NIV'}, axis='columns', inplace=True)
 
     return processed_features, processed_target
+
+
 
 
 def log_normalize(series):
@@ -175,6 +178,11 @@ processed_features['Other'] = log_normalize(processed_features['Other'])
 
 # ----------------------------------------------------------------------------------------------------------------------
 # calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
+
+processed_features = processed_features.loc[processed_features.index > 2016000000, :]
+train = processed_features.loc[processed_features.index < 2018030000, :]
+validate = processed_features.loc[processed_features.index > 2018030000, :]
+
 correlation_matrix = processed_features.corr()
 cm_NIV = correlation_matrix['NIV']
 cm_NIV = cm_NIV.reindex(cm_NIV.abs().sort_values(ascending=False).index)
