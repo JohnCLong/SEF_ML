@@ -168,10 +168,10 @@ X_validate = (X_validate-X_train_mean)/X_train_std
 lin = LinearRegression()
 lin.fit(X_train, y_train)
 
-ela = ElasticNet(alpha=171.727)
+ela = ElasticNet(alpha=0.460)
 ela.fit(X_train, y_train)
 
-lass = Lasso(alpha=92.069)
+lass = Lasso(alpha=0.705)
 lass.fit(X_train, y_train)
 
 forest_reg = RandomForestRegressor(n_estimators=400, min_samples_split=2, min_samples_leaf=4, max_features='sqrt',
