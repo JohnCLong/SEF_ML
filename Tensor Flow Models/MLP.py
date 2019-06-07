@@ -172,6 +172,7 @@ y_test = processed_test_targets
 # ----------------------------------------------------------------------------------------------------------------------
 # build MLP model
 root_logdir = os.path.join(os.curdir, "my_logs")
+root_modeldir = os.path.join(os.curdir, "Tensor Flow Models/models")
 
 
 def get_run_logdir():
@@ -179,23 +180,68 @@ def get_run_logdir():
     run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
     return os.path.join(root_logdir, run_id)
 
+def get_run_modeldir():
+    import time
+    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S.h5")
+    return os.path.join(root_modeldir, run_id)
+
 
 run_logdir = get_run_logdir()
+model_dir = get_run_modeldir()
+
+
+def build_model(n_hidden=3, n_neurons=30, learning_rate=0.001, input_shape=[10,], l2_reg=0.01):
+    model = keras.models.Sequential()
+    inpt_options = {"input_shape": input_shape}
+    options = {"kernel_regularizer": keras.regularizers.l2(l2_reg)}
+    for layer in range(n_hidden):
+        model.add(keras.layers.Dense(n_neurons, activation="relu", **inpt_options, **options))
+        inpt_options = {}
+    model.add(keras.layers.Dense(1, **inpt_options))
+    optimizer = keras.optimizers.SGD(learning_rate)
+    model.compile(loss="mean_squared_error", optimizer=optimizer)
+    return model
+
+
+keras_reg = keras.wrappers.scikit_learn.KerasRegressor(build_model)
+tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
+checkpoint_cb = keras.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
+
+from sklearn.model_selection import RandomizedSearchCV
+
+param_distribs = {
+    "n_hidden": [2, 3, 4],
+    "n_neurons": np.arange(30, 100, 5),
+    "learning_rate": [0.1, 0.01, 0.001],
+}
+
+rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=10, cv=3)
+rnd_search_cv.fit(X_train, y_train, epochs=100, validation_data=(X_valid, y_valid),
+                  callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=10), tensorboard_cb, checkpoint_cb])
+
+print(rnd_search_cv.best_params_)
+print(rnd_search_cv.best_score_)
+model = rnd_search_cv.best_estimator_.model
+"""""
 
 model = keras.models.Sequential([
-    keras.layers.Dense(30, activation="relu", input_shape=[len(X_train.keys())]),
-    keras.layers.Dense(64, activation='relu'),
-    keras.layers.Dense(30, activation='relu'),
+    keras.layers.Dense(30, activation="relu", kernel_initializer="he_normal", input_shape=[len(X_train.keys())],
+                       kernel_regularizer=keras.regularizers.l2(0.01)),
+    keras.layers.Dense(64, activation="relu", kernel_initializer="he_normal",
+                       kernel_regularizer=keras.regularizers.l2(0.01)),
+    keras.layers.Dense(30, activation="relu", kernel_initializer="he_normal",
+                       kernel_regularizer=keras.regularizers.l2(0.01)),
     keras.layers.Dense(1)
 ])
 
-optimizer = tf.keras.optimizers.RMSprop(0.001)
+optimizer = tf.keras.optimizers.Nadam
 model.compile(loss="mean_squared_error", optimizer=optimizer)
 
-tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
-history = model.fit(X_train, y_train, epochs=1, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
+
+history = model.fit(X_train, y_train, epochs=200, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
 
 mse_test = model.evaluate(X_test, y_test)
+
 
 pd.DataFrame(history.history).plot(figsize=(8, 5))
 plt.show()
@@ -217,3 +263,4 @@ plt.xlabel('Days')
 plt.ylabel('NIV')
 plt.title('MLP Model')
 plt.show()
+"""
