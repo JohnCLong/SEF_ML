@@ -190,10 +190,10 @@ model = keras.models.Sequential([
 ])
 
 optimizer = tf.keras.optimizers.RMSprop(0.001)
-model.compile(loss="mean_squared_error", optimizer=optimizer)
+model.compile(loss="mse", optimizer=optimizer)
 
 tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
-history = model.fit(X_train, y_train, epochs=1000, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
+history = model.fit(X_train, y_train, epochs=10, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
 
 mse_test = model.evaluate(X_test, y_test)
 

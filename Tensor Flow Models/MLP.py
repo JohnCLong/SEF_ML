@@ -154,8 +154,8 @@ X_valid_all = processed_features.loc[processed_features.index > 2018030000, :]
 y_valid = processed_targets.loc[processed_targets.index > 2018030000]
 
 # Normalize the validation data and separate into X and y variables data frames.
-cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice',
-      'Biomass', 'Other', 'wind_off', 'initialWindForecast', 'Wind_Frac', 'Val_Diff', ]
+cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice','Biomass', 'Other', 'wind_off', 'initialWindForecast',
+            'Wind_Frac', 'Val_Diff', ]
 
 X_train = X_train_all.loc[:, cols_all]
 X_train_mean = X_train.mean()
@@ -198,7 +198,7 @@ def build_model(n_hidden=3, n_neurons=30, learning_rate=0.001, input_shape=[10,]
         model.add(keras.layers.Dense(n_neurons, activation="relu", **inpt_options, **options))
         inpt_options = {}
     model.add(keras.layers.Dense(1, **inpt_options))
-    optimizer = keras.optimizers.SGD(learning_rate)
+    optimizer = keras.optimizers.RMSprop(learning_rate)
     model.compile(loss="mean_squared_error", optimizer=optimizer)
     return model
 
@@ -211,8 +211,9 @@ from sklearn.model_selection import RandomizedSearchCV
 
 param_distribs = {
     "n_hidden": [2, 3, 4],
-    "n_neurons": np.arange(30, 100, 5),
+    "n_neurons": np.arange(30, 60, 2),
     "learning_rate": [0.1, 0.01, 0.001],
+    "l2_reg": [0.1, 0.01, 0.001, 0.0001],
 }
 
 rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=10, cv=3)
