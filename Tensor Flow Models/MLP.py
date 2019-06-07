@@ -142,10 +142,10 @@ processed_features['Other'] = log_normalize(processed_features['Other'])
 # calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
 
 processed_test_features = processed_features.loc[processed_features.index < 2016500000, :]
-processed_test_targets = processed_targets.loc[processed_targets.index < 2016500000]/100
+processed_test_targets = processed_targets.loc[processed_targets.index < 2016500000]
 
 processed_features = processed_features.loc[processed_features.index > 2016500000, :]
-processed_targets = processed_targets.loc[processed_targets.index > 2016500000]/100
+processed_targets = processed_targets.loc[processed_targets.index > 2016500000]
 
 X_train_all = processed_features.loc[processed_features.index < 2018030000, :]
 y_train = processed_targets.loc[processed_targets.index < 2018030000]
@@ -193,9 +193,27 @@ optimizer = tf.keras.optimizers.RMSprop(0.001)
 model.compile(loss="mean_squared_error", optimizer=optimizer)
 
 tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
-history = model.fit(X_train, y_train, epochs=1000, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
+history = model.fit(X_train, y_train, epochs=1, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
 
 mse_test = model.evaluate(X_test, y_test)
 
 pd.DataFrame(history.history).plot(figsize=(8, 5))
+plt.show()
+
+model_trained = keras.models.load_model("30_60_30_MLP_model.h5")
+y_MLP_prediction = model_trained.predict(X_test)
+MLP_mse = mean_squared_error(y_test, y_MLP_prediction)
+MLP_rmse = np.sqrt(MLP_mse)*100
+
+# convert periods to days
+days = np.arange(len(y_MLP_prediction))/48
+max_days = 10*48
+
+# Plot data on one graph.
+plt.rcParams["figure.figsize"] = (30, 10)
+plt.plot(days[:max_days], y_test.values[:max_days], color='k', linewidth=2, linestyle='dashed')
+plt.plot(days[:max_days], y_MLP_prediction[:max_days], color='b')
+plt.xlabel('Days')
+plt.ylabel('NIV')
+plt.title('MLP Model')
 plt.show()
