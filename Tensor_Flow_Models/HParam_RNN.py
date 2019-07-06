@@ -210,9 +210,9 @@ def get_run_hyperdir(name):
     return os.path.join(root_hyperdir, run_id)
 
 
-HP_L1_NUM_UNITS = hp.HParam('l1_num_units', hp.Discrete(list(range(11, 21, 2))))
-HP_DROPOUT = hp.HParam('dropout', hp.RealInterval(0.1, 0.2))
-HP_L2_NUM_UNITS = hp.HParam('l2_num_units', hp.Discrete(list(range(11, 21, 2))))
+HP_L1_NUM_UNITS = hp.HParam('l1_num_units', hp.Discrete(list(range(1, 200, 20))))
+HP_DROPOUT = hp.HParam('dropout', hp.Discrete(list(range(1,4,1))))
+HP_L2_NUM_UNITS = hp.HParam('l2_num_units', hp.Discrete(list(range(1, 200, 20))))
 METRIC_ACCURACY = 'mse'
 
 with tf.summary.create_file_writer('Tensor_Flow_Models/RNN_test/hyper_param/').as_default():
@@ -247,7 +247,7 @@ def RNN_model(hparams):
               epochs=20,
               validation_data=(X_valid, y_valid),
               callbacks=[tf.keras.callbacks.TensorBoard(run_name, profile_batch=0),
-                         hp.KerasCallback(run_name, hparams, ),
+                         hp.KerasCallback(run_name, hparams),
                          tf.keras.callbacks.EarlyStopping(monitor='val_loss',patience=5)
                          ])
   #  _, loss = model.evaluate(X_test, y_test)
@@ -263,11 +263,11 @@ def run(run_dir, hparams):
 session_num = 0
 
 for l1_num_units in HP_L1_NUM_UNITS.domain.values:
-    for dropout_rate in (HP_DROPOUT.domain.min_value, HP_DROPOUT.domain.max_value):
+    for dropout_rate in HP_DROPOUT.domain.values:
         for l2_num_units in HP_L2_NUM_UNITS.domain.values:
             hparams = {
                 HP_L1_NUM_UNITS: l1_num_units,
-                HP_DROPOUT: dropout_rate,
+                HP_DROPOUT: dropout_rate/10,
                 HP_L2_NUM_UNITS: l2_num_units
             }
             parameters = {h.name: hparams[h] for h in hparams}
