@@ -99,12 +99,19 @@ def preprocess_features(raw_data):
                                                         renewable_generation_forecast.loc[:, 'wind_on'])
     processed_features['Val_Diff'] = processed_features['initialWindForecast'] \
                                      - processed_features['latestWindForecast']
+
     processed_features['Solar_Frac'] = processed_features['solar'] / processed_features['quantity']
+
     processed_features['Wind_Frac'] = (processed_features['wind_off'] + processed_features['wind_on'])\
                                       / processed_features['quantity']
+
     processed_features['Renewable_Frac'] = processed_features['RenewablePrediction'] / processed_features['quantity']
     processed_features.indicativeNetImbalanceVolume = processed_features.indicativeNetImbalanceVolume.shift(2)
     processed_features.indicativeNetImbalanceVolume = processed_features.indicativeNetImbalanceVolume.fillna(0)
+
+    processed_features["NIV_shift_1hr"] = processed_target.shift(2).fillna(processed_target.mean())
+
+    processed_features["NIV_shift_4hr"] = processed_target.shift(8).fillna(processed_target.mean())
 
     # Rename columns
     processed_target = processed_target.rename("NIV")
@@ -115,11 +122,11 @@ def preprocess_features(raw_data):
 
 
 def log_normalize(series):
-  return series.apply(lambda x: np.log(x+1.0))
+    return series.apply(lambda x: np.log(x+1.0))
 
 
 def clip(series, clip_to_min, clip_to_max):
-  return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
+    return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
 
 
 [processed_features, processed_targets] = preprocess_features(raw_data)
@@ -141,22 +148,34 @@ processed_features['Other'] = log_normalize(processed_features['Other'])
 # ----------------------------------------------------------------------------------------------------------------------
 # calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
 
-processed_test_features = processed_features.loc[processed_features.index < 2016500000, :]
-processed_test_targets = processed_targets.loc[processed_targets.index < 2016500000]
+processed_test_features = processed_features.loc[processed_features.index > 2018100000, :]
+processed_test_targets = processed_targets.loc[processed_targets.index > 2018100000]
 
-processed_features = processed_features.loc[processed_features.index > 2016500000, :]
-processed_targets = processed_targets.loc[processed_targets.index > 2016500000]
+processed_features = processed_features.loc[processed_features.index > 2017050000, :]
+processed_targets = processed_targets.loc[processed_targets.index > 2017050000]
 
-X_train_all = processed_features.loc[processed_features.index < 2018030000, :]
-y_train = processed_targets.loc[processed_targets.index < 2018030000]
+X_train_all = processed_features.loc[processed_features.index < 2018080000, :]
+y_train = processed_targets.loc[processed_targets.index < 2018080000]
 
-X_valid_all = processed_features.loc[processed_features.index > 2018030000, :]
-y_valid = processed_targets.loc[processed_targets.index > 2018030000]
+X_valid_all = processed_features.loc[processed_features.index > 2018080000, :]
+y_valid = processed_targets.loc[processed_targets.index > 2018080000]
+X_valid_all = X_valid_all.loc[X_valid_all.index < 2018100000, :]
+y_valid = y_valid.loc[y_valid.index < 2018100000]
 
 # Normalize the validation data and separate into X and y variables data frames.
-cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice','Biomass', 'Other', 'wind_off', 'initialWindForecast',
-            'Wind_Frac', 'Val_Diff', ]
+#cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice','Biomass', 'Other', 'wind_off', 'initialWindForecast',
+#            'Wind_Frac', 'Val_Diff', ]
 
+cols_all = ['Biomass', 'FossilGas', 'FossilHardCoal', 'HydroPumpedStorage',
+       'HydroRunOfRiver', 'Nuclear', 'OffWind', 'OnWind', 'Other', 'Solar',
+       'settlementPeriod', 'APXPrice', 'APXVolume', 'solar', 'wind_off',
+       'wind_on', 'TSDF', 'Generation', 'buyPriceAdjustment', 'Shift_NIV',
+       'reserveScarcityPrice', 'ITSDO', 'intewGeneration',
+       'intfrGeneration', 'intirlGeneration', 'intnedGeneration',
+       'drm2HourForecast', 'lolp1HourForecast', 'N2EXPrice', 'N2EXVolume',
+       'initialWindForecast', 'latestWindForecast', 'windOutturn',
+       'RenewablePrediction', 'Val_Diff', 'Solar_Frac', 'Wind_Frac',
+       'Renewable_Frac', 'NIV_shift_1hr', 'NIV_shift_4hr']
 X_train = X_train_all.loc[:, cols_all]
 X_train_mean = X_train.mean()
 X_train_std = X_train.std()
@@ -172,7 +191,7 @@ y_test = processed_test_targets
 # ----------------------------------------------------------------------------------------------------------------------
 # build MLP model
 root_logdir = os.path.join(os.curdir, "my_logs")
-root_modeldir = os.path.join(os.curdir, "Tensor Flow Models/models")
+root_modeldir = os.path.join(os.curdir, "Tensor_Flow_Models/models")
 
 
 def get_run_logdir():
@@ -180,9 +199,10 @@ def get_run_logdir():
     run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
     return os.path.join(root_logdir, run_id)
 
+
 def get_run_modeldir():
     import time
-    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S.h5")
+    run_id = time.strftime("MLP_run_%Y_%m_%d-%H_%M_%S.h5")
     return os.path.join(root_modeldir, run_id)
 
 
@@ -190,16 +210,18 @@ run_logdir = get_run_logdir()
 model_dir = get_run_modeldir()
 
 
-def build_model(n_hidden=3, n_neurons=30, learning_rate=0.001, input_shape=[10,], l2_reg=0.01):
+def build_model(n_hidden=3, n_neurons=30, learning_rate=0.001, input_shape=[40, ], l2_reg=0.01):
     model = keras.models.Sequential()
     inpt_options = {"input_shape": input_shape}
     options = {"kernel_regularizer": keras.regularizers.l2(l2_reg)}
     for layer in range(n_hidden):
-        model.add(keras.layers.Dense(n_neurons, activation="relu", **inpt_options, **options))
+        model.add(keras.layers.Dense(n_neurons, activation="relu", kernel_initializer="he_normal", **inpt_options,
+                                     **options))
         inpt_options = {}
     model.add(keras.layers.Dense(1, **inpt_options))
-    optimizer = keras.optimizers.RMSprop(learning_rate)
-    model.compile(loss="mean_squared_error", optimizer=optimizer)
+    optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0,
+                                      amsgrad=False)
+    model.compile(loss="mse", optimizer=optimizer)
     return model
 
 
@@ -210,19 +232,23 @@ checkpoint_cb = keras.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
 from sklearn.model_selection import RandomizedSearchCV
 
 param_distribs = {
-    "n_hidden": [2, 3, 4],
-    "n_neurons": np.arange(30, 60, 2),
-    "learning_rate": [0.1, 0.01, 0.001],
-    "l2_reg": [0.1, 0.01, 0.001, 0.0001],
+    "n_hidden": [],
+    "n_neurons": [1,200,5],
+    "learning_rate": [0.001, 0.0001],
+    "l2_reg": [0.00001],
 }
 
-rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=10, cv=3)
-rnd_search_cv.fit(X_train, y_train, epochs=100, validation_data=(X_valid, y_valid),
-                  callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=10), tensorboard_cb, checkpoint_cb])
+rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=1, cv=2)
+rnd_search_cv.fit(X_train, y_train,
+                  epochs=200,
+                  validation_data=(X_valid, y_valid),
+                  callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=10), tensorboard_cb,
+                             checkpoint_cb])
 
 print(rnd_search_cv.best_params_)
 print(rnd_search_cv.best_score_)
 model = rnd_search_cv.best_estimator_.model
+history = model.history
 """""
 
 model = keras.models.Sequential([
@@ -237,20 +263,20 @@ model = keras.models.Sequential([
 
 optimizer = tf.keras.optimizers.Nadam
 model.compile(loss="mean_squared_error", optimizer=optimizer)
-
-
 history = model.fit(X_train, y_train, epochs=200, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
 
+"""
 mse_test = model.evaluate(X_test, y_test)
 
 
 pd.DataFrame(history.history).plot(figsize=(8, 5))
 plt.show()
 
-model_trained = keras.models.load_model("30_60_30_MLP_model.h5")
+model_trained = model
+# keras.models.load_model("Tensor_Flow_Models/models/MLP_run_2019_06_10-11_12_00.h5")
 y_MLP_prediction = model_trained.predict(X_test)
 MLP_mse = mean_squared_error(y_test, y_MLP_prediction)
-MLP_rmse = np.sqrt(MLP_mse)*100
+MLP_rmse = np.sqrt(MLP_mse)
 
 # convert periods to days
 days = np.arange(len(y_MLP_prediction))/48
@@ -264,4 +290,3 @@ plt.xlabel('Days')
 plt.ylabel('NIV')
 plt.title('MLP Model')
 plt.show()
-"""
