@@ -211,7 +211,7 @@ def get_run_modeldir(name):
 
 def get_run_hyperdir(name):
     import time
-    run_id = time.strftime(f"run_{name}_{parameters}")
+    run_id = time.strftime(f"run_{name}")
     return os.path.join(root_hyperdir, run_id)
 """
 with tf.summary.create_file_writer('Tensor_Flow_Models/RNN_test/hyper_param/').as_default():
@@ -252,25 +252,29 @@ def RNN_model(hp):
 
 def RNN_model(hp):
     model = keras.models.Sequential([
-    keras.layers.SimpleRNN(hp.Range('units_1', min_value=1, max_value=11, step=10),
-                                     input_shape=[None, 1],
-                                     activation="relu",
-                                     return_sequences=True),
-    keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.1, 0.2, 0.3], default=0)),
-    keras.layers.SimpleRNN(hp.Range('units_2', min_value=1, max_value=21, step=10),
-                                     input_shape=[None, 1],
-                                     activation="relu",
-                                     return_sequences=True),
-    keras.layers.Dense(1)
+        keras.layers.SimpleRNN(hp.Range('units_1', min_value=1, max_value=11, step=10),
+                               input_shape=[None, 1],
+                               activation="relu",
+                               return_sequences=True),
+        keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.1, 0.2, 0.3], default=0)),
+        keras.layers.SimpleRNN(hp.Range('units_2', min_value=1, max_value=21, step=10),
+                               input_shape=[None, 1],
+                               activation="relu",
+                               return_sequences=True),
+        keras.layers.Dense(1)
     ])
-    model.compile(loss="mse", optimizer="adam", metrics=['mse', 'mae'])
+
+    model.compile(loss="mse",
+                  optimizer="adam",
+                  metrics=['mse', 'mae'])
     return model
+
 
 tuner = RandomSearch(
     RNN_model,
     objective='loss',
-    max_trials=30,
-    executions_per_trial=1,
+    max_trials=5,
+    executions_per_trial=3,
     directory='Tensor_Flow_Models/RNN_test/keras_tuner',
     project_name=time.strftime(f"run_%Y_%m_%d-%H_%M_%S.h5")
 )
