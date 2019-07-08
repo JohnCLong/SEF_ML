@@ -3,6 +3,7 @@ import numpy as np
 import os
 import tensorflow as tf
 import time
+from tensorboard.plugins.hparams import api as hyp
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
@@ -208,44 +209,32 @@ def get_run_modeldir(name):
     run_id = time.strftime(f"run_{name}_%Y_%m_%d-%H_%M_%S.h5")
     return os.path.join(root_modeldir, run_id)
 
+a = 0
+b = 0
 
-def get_run_hyperdir(name):
+def get_run_hyperdir(a, b):
     import time
-    run_id = time.strftime(f"run_{name}")
-    return os.path.join(root_hyperdir, run_id)
-"""
-with tf.summary.create_file_writer('Tensor_Flow_Models/RNN_test/hyper_param/').as_default():
-    hp.hparams_config(
-    hparams=[HP_L1_NUM_UNITS, HP_L2_NUM_UNITS, HP_DROPOUT],
-    metrics=[
-
-             hp.Metric("epoch_loss",
-                       group="train",
-                       display_name="epoch loss (train)"),
-
-             hp.Metric("epoch_loss",
-                       group="validation",
-                       display_name="epoch loss (val)"),
-
-             hp.Metric("epoch_mae",
-                       group="validation",
-                       display_name="epoch mae (val)")]
-    )
-    """
+    a = a
+    run_id = time.strftime(f"run_{tuner.hyperparameters.values.values()}_epoch_{b}-{a}")
+    a += 1
+    if a%epoch ==0:
+        a = 0
+        b +=1
+        return a, b
+    return os.path.join(root_hyperdir, run_id), a, b
 # ----------------------------------------------------------------------------------------------------------------------
-
 hp = HyperParameters()
 
 
 def RNN_model(hp):
     model = keras.models.Sequential()
-    for i in range(hp.Range('num_layers', 0, 9)):
+    for i in range(hp.Range('num_layers', 0, 10)):
         model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i), min_value=1, max_value=501, step=10),
                                          input_shape=[None, 1],
                                          activation="relu",
                                          return_sequences=True))
-        model.add(keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.01, 0.1, 1, 10], default=0)))
-    model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i + 1), min_value=1, max_value=501, step=10),
+        model.add(keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.01, 0.1, 0.4, 0.6], default=0)))
+    model.add(keras.layers.SimpleRNN(units=hp.Range('units_last', min_value=1, max_value=501, step=10),
                                      input_shape=[None, 1],
                                      activation="relu"))
     model.add(keras.layers.Dense(1))
@@ -256,19 +245,20 @@ def RNN_model(hp):
 tuner = RandomSearch(
     RNN_model,
     objective='loss',
-    max_trials=30,
-    executions_per_trial=1,
+    max_trials=50,
+    executions_per_trial=3,
     directory='Tensor_Flow_Models/RNN_test/keras_tuner',
-    project_name=time.strftime(f"run_%Y_%m_%d-%H_%M_%S.h5")
+    project_name=time.strftime(f"run_%Y_%m_%d-%H_%M_%S")
 )
 
 tuner.search_space_summary()
-
+epoch = 100
 tuner.search(X_train, y_train,
-             epochs=200,
+             epochs=epoch,
              validation_data=(X_valid, y_valid),
              callbacks=[
-                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5),
+                tf.keras.callbacks.TensorBoard(profile_batch=0),
              ])
 
 # Show the best models, their hyperparameters, and the resulting metrics.
