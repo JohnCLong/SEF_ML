@@ -210,9 +210,9 @@ def get_run_hyperdir(name):
     return os.path.join(root_hyperdir, run_id)
 
 
-HP_L1_NUM_UNITS = hp.HParam('l1_num_units', hp.Discrete(list(range(1, 200, 20))))
-HP_DROPOUT = hp.HParam('dropout', hp.Discrete(list(range(1,4,1))))
-HP_L2_NUM_UNITS = hp.HParam('l2_num_units', hp.Discrete(list(range(1, 200, 20))))
+HP_L1_NUM_UNITS = hp.HParam('l1_num_units', hp.Discrete(list(range(1, 400, 20))))
+HP_DROPOUT = hp.HParam('dropout', hp.Discrete(list(range(1,2,1))))
+HP_L2_NUM_UNITS = hp.HParam('l2_num_units', hp.Discrete(list(range(1, 400, 20))))
 METRIC_ACCURACY = 'mse'
 
 with tf.summary.create_file_writer('Tensor_Flow_Models/RNN_test/hyper_param/').as_default():
@@ -236,7 +236,7 @@ with tf.summary.create_file_writer('Tensor_Flow_Models/RNN_test/hyper_param/').a
 
 def RNN_model(hparams):
     model = keras.models.Sequential([
-        keras.layers.SimpleRNN(hparams[HP_L1_NUM_UNITS], input_shape=[None, 1], activation ="relu", return_sequences=True),
+        keras.layers.SimpleRNN(hparams[HP_L1_NUM_UNITS], input_shape=[None, 1], activation="relu", return_sequences=True),
         tf.keras.layers.Dropout(hparams[HP_DROPOUT]),
         keras.layers.SimpleRNN(hparams[HP_L2_NUM_UNITS], input_shape=[None, 1], activation="relu"),
         keras.layers.Dense(1)

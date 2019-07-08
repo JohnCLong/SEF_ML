@@ -236,45 +236,28 @@ with tf.summary.create_file_writer('Tensor_Flow_Models/RNN_test/hyper_param/').a
 
 hp = HyperParameters()
 
-"""
+
 def RNN_model(hp):
     model = keras.models.Sequential()
-    for i in range(hp.Range('num_layers', 1, 2)):
+    for i in range(hp.Range('num_layers', 0, 9)):
         model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i), min_value=1, max_value=501, step=10),
                                          input_shape=[None, 1],
                                          activation="relu",
                                          return_sequences=True))
-        model.add(keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.1, 0.2, 0.3], default=0)))
+        model.add(keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.01, 0.1, 1, 10], default=0)))
+    model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i + 1), min_value=1, max_value=501, step=10),
+                                     input_shape=[None, 1],
+                                     activation="relu"))
     model.add(keras.layers.Dense(1))
     model.compile(loss="mse", optimizer="adam", metrics=['mse', 'mae'])
-    return model
-"""
-
-def RNN_model(hp):
-    model = keras.models.Sequential([
-        keras.layers.SimpleRNN(hp.Range('units_1', min_value=1, max_value=11, step=10),
-                               input_shape=[None, 1],
-                               activation="relu",
-                               return_sequences=True),
-        keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.1, 0.2, 0.3], default=0)),
-        keras.layers.SimpleRNN(hp.Range('units_2', min_value=1, max_value=21, step=10),
-                               input_shape=[None, 1],
-                               activation="relu",
-                               return_sequences=True),
-        keras.layers.Dense(1)
-    ])
-
-    model.compile(loss="mse",
-                  optimizer="adam",
-                  metrics=['mse', 'mae'])
     return model
 
 
 tuner = RandomSearch(
     RNN_model,
     objective='loss',
-    max_trials=5,
-    executions_per_trial=3,
+    max_trials=30,
+    executions_per_trial=1,
     directory='Tensor_Flow_Models/RNN_test/keras_tuner',
     project_name=time.strftime(f"run_%Y_%m_%d-%H_%M_%S.h5")
 )
@@ -282,10 +265,10 @@ tuner = RandomSearch(
 tuner.search_space_summary()
 
 tuner.search(X_train, y_train,
-             epochs=20,
+             epochs=200,
              validation_data=(X_valid, y_valid),
              callbacks=[
-                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
              ])
 
 # Show the best models, their hyperparameters, and the resulting metrics.
