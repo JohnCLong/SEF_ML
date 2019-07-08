@@ -2,10 +2,25 @@ import pandas as pd
 import numpy as np
 import os
 import tensorflow as tf
+import time
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
+from tensorflow import keras
+from kerastuner.tuners import RandomSearch
+from kerastuner.engine.hyperparameters import HyperParameters
+
+mpl.rc('axes', labelsize=14)
+mpl.rc('xtick', labelsize=12)
+mpl.rc('ytick', labelsize=12)
+
+np.random.seed(42)
+tf.random.set_seed(42)
 
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -128,176 +143,149 @@ def log_normalize(series):
 def clip(series, clip_to_min, clip_to_max):
     return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
 
+def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$"):
+    plt.plot(series, ".-")
+    if y is not None:
+        plt.plot(n_steps, y, "bx", markersize=10)
+    if y_pred is not None:
+        plt.plot(n_steps, y_pred, "ro")
+    plt.grid(True)
+    if x_label:
+        plt.xlabel(x_label, fontsize=16)
+    if y_label:
+        plt.ylabel(y_label, fontsize=16, rotation=0)
+    plt.hlines(0, 0, 100, linewidth=1)
+    plt.axis([0, n_steps + 1, -1250, 1000])
+
+
+def plot_learning_curves(loss, val_loss):
+    plt.plot(np.arange(len(loss)) + 0.5, loss, "b.-", label="Training loss")
+    plt.plot(np.arange(len(val_loss)) + 1, val_loss, "r.-", label="Validation loss")
+    plt.gca().xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+#    plt.axis([1, 20, 0, 0.05])
+    plt.legend(fontsize=14)
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.grid(True)
+
 
 [processed_features, processed_targets] = preprocess_features(raw_data)
-processed_features_copy = processed_features.copy()
-
-processed_features['APXPrice'] = clip(processed_features['APXPrice'], 0, 200)
-processed_features['Biomass'] = clip(processed_features['Biomass'], 0, 4000)
-processed_features['Nuclear'] = clip(processed_features['Nuclear'], 4000, 10000)
-processed_features['OffWind'] = clip(processed_features['OffWind'], 0, 5000)
-processed_features['OffWind'] = clip(processed_features['OffWind'], 0, 11000)
-processed_features['ImbalancePrice'] = clip(processed_features['ImbalancePrice'], -100, 250)
-
-processed_features['FossilHardCoal'] = log_normalize(processed_features['FossilHardCoal'])
-processed_features['HydroPumpedStorage'] = log_normalize(processed_features['HydroPumpedStorage'])
-processed_features['HydroRunOfRiver'] = log_normalize(processed_features['HydroRunOfRiver'])
-processed_features['solar'] = log_normalize(processed_features['solar'])
-processed_features['Other'] = log_normalize(processed_features['Other'])
+# ----------------------------------------------------------------------------------------------------------------------
+series = processed_targets[4:].values.reshape(929,55)
+series = series[..., np.newaxis].astype(np.float32)
+n_steps = 54
+X_train, y_train = series[:729, :n_steps], series[:729, -1]
+X_valid, y_valid = series[729:829, :n_steps], series[729:829, -1]
+X_test, y_test = series[829:, :n_steps], series[829:, -1]
 
 # ----------------------------------------------------------------------------------------------------------------------
-# calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
+fig, axes = plt.subplots(nrows=1, ncols=3, sharey=True, figsize=(12, 4))
+for col in range(3):
+    plt.sca(axes[col])
+    plot_series(X_valid[col, :, 0], y_valid[col, 0],
+                y_label=("$x(t)$" if col == 0 else None))
+#plt.show()
 
-processed_test_features = processed_features.loc[processed_features.index > 2018100000, :]
-processed_test_targets = processed_targets.loc[processed_targets.index > 2018100000]
+y_pred = X_valid[:, -1]
+naive_loss = np.mean(keras.losses.mean_squared_error(y_valid, y_pred))
 
-processed_features = processed_features.loc[processed_features.index > 2017050000, :]
-processed_targets = processed_targets.loc[processed_targets.index > 2017050000]
-
-X_train_all = processed_features.loc[processed_features.index < 2018050000, :]
-y_train = processed_targets.loc[processed_targets.index < 2018050000]
-
-X_valid_all = processed_features.loc[processed_features.index > 2018050000, :]
-y_valid = processed_targets.loc[processed_targets.index > 2018050000]
-X_valid_all = X_valid_all.loc[X_valid_all.index < 2018100000, :]
-y_valid = y_valid.loc[y_valid.index < 2018100000]
-
-# Normalize the validation data and separate into X and y variables data frames.
-#cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice','Biomass', 'Other', 'wind_off', 'initialWindForecast',
-#            'Wind_Frac', 'Val_Diff', ]
-
-cols_all = ['Biomass', 'FossilGas', 'FossilHardCoal', 'HydroPumpedStorage',
-       'HydroRunOfRiver', 'Nuclear', 'OffWind', 'OnWind', 'Other', 'Solar',
-       'settlementPeriod', 'APXPrice', 'APXVolume', 'solar', 'wind_off',
-       'wind_on', 'TSDF', 'Generation', 'buyPriceAdjustment', 'Shift_NIV',
-       'reserveScarcityPrice', 'ITSDO', 'intewGeneration',
-       'intfrGeneration', 'intirlGeneration', 'intnedGeneration',
-       'drm2HourForecast', 'lolp1HourForecast', 'N2EXPrice', 'N2EXVolume',
-       'initialWindForecast', 'latestWindForecast', 'windOutturn',
-       'RenewablePrediction', 'Val_Diff', 'Solar_Frac', 'Wind_Frac',
-       'Renewable_Frac', 'NIV_shift_1hr', 'NIV_shift_4hr']
-X_train = X_train_all.loc[:, cols_all]
-X_train_mean = X_train.mean()
-X_train_std = X_train.std()
-X_train = ((X_train - X_train_mean) / X_train_std)
-
-X_valid = X_valid_all.loc[:, cols_all]
-X_valid = ((X_valid-X_train_mean)/X_train_std)
-
-X_test = processed_test_features.loc[:, cols_all]
-X_test = ((X_test-X_train_mean)/X_train_std)
-
-y_test = processed_test_targets
-
-train_dataset = tf.data.Dataset.from_tensor_slices((X_train.values, y_train.values))
-valid_dataset = tf.data.Dataset.from_tensor_slices((X_valid.values, y_valid.values))
-test_dataset = tf.data.Dataset.from_tensor_slices((X_test.values, y_test.values))
-
-
+plot_series(X_valid[0, :, 0], y_valid[0, 0], y_pred[0, 0])
+#plt.show()
 # ----------------------------------------------------------------------------------------------------------------------
-# build MLP model
-root_logdir = os.path.join(os.curdir, "my_logs")
-root_modeldir = os.path.join(os.curdir, "Tensor_Flow_Models/models")
+root_logdir = os.path.join(".", "Tensor_Flow_Models/RNN_test/my_logs")
+root_modeldir = os.path.join(".", "Tensor_Flow_Models/RNN_test/models")
+root_hyperdir = os.path.join(".", "Tensor_Flow_Models/RNN_test/hyper_param")
 
 
-def get_run_logdir():
+def get_run_logdir(name):
     import time
-    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
+    run_id = time.strftime(f"{name}_run")
     return os.path.join(root_logdir, run_id)
 
 
-def get_run_modeldir():
+def get_run_modeldir(name):
     import time
-    run_id = time.strftime("MLP_run_%Y_%m_%d-%H_%M_%S.h5")
+    run_id = time.strftime(f"run_{name}_%Y_%m_%d-%H_%M_%S.h5")
     return os.path.join(root_modeldir, run_id)
 
 
-run_logdir = get_run_logdir()
-model_dir = get_run_modeldir()
-#"""
+def get_run_hyperdir(name):
+    import time
+    run_id = time.strftime(f"run_{name}_{parameters}")
+    return os.path.join(root_hyperdir, run_id)
+"""
+with tf.summary.create_file_writer('Tensor_Flow_Models/RNN_test/hyper_param/').as_default():
+    hp.hparams_config(
+    hparams=[HP_L1_NUM_UNITS, HP_L2_NUM_UNITS, HP_DROPOUT],
+    metrics=[
 
-def build_model(n_hidden=3, n_neurons=128, learning_rate=0.001, input_shape=(40,), l2_reg=0.01):
+             hp.Metric("epoch_loss",
+                       group="train",
+                       display_name="epoch loss (train)"),
+
+             hp.Metric("epoch_loss",
+                       group="validation",
+                       display_name="epoch loss (val)"),
+
+             hp.Metric("epoch_mae",
+                       group="validation",
+                       display_name="epoch mae (val)")]
+    )
+    """
+# ----------------------------------------------------------------------------------------------------------------------
+
+hp = HyperParameters()
+
+"""
+def RNN_model(hp):
     model = keras.models.Sequential()
-    inpt_options = {"input_shape": input_shape}
-    options = {"kernel_regularizer": keras.regularizers.l2(l2_reg)}
+    for i in range(hp.Range('num_layers', 1, 2)):
+        model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i), min_value=1, max_value=501, step=10),
+                                         input_shape=[None, 1],
+                                         activation="relu",
+                                         return_sequences=True))
+        model.add(keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.1, 0.2, 0.3], default=0)))
+    model.add(keras.layers.Dense(1))
+    model.compile(loss="mse", optimizer="adam", metrics=['mse', 'mae'])
+    return model
+"""
 
-    for layer in range(n_hidden):
-        model.add(keras.layers.LSTM(n_neurons, activation="relu", kernel_initializer="he_normal", return_sequences=True,
-                                    **inpt_options, **options))
-        model.add(keras.layers.Dropout(0.2))
-        inpt_options = {}
-
-    model.add(keras.layers.LSTM(n_neurons, activation="relu", kernel_initializer="he_normal", **inpt_options, **options))
-    model.add(keras.layers.Dense(1, **inpt_options))
-    optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    model.compile(loss="mean_squared_error", optimizer=optimizer)
+def RNN_model(hp):
+    model = keras.models.Sequential([
+    keras.layers.SimpleRNN(hp.Range('units_1', min_value=1, max_value=11, step=10),
+                                     input_shape=[None, 1],
+                                     activation="relu",
+                                     return_sequences=True),
+    keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.1, 0.2, 0.3], default=0)),
+    keras.layers.SimpleRNN(hp.Range('units_2', min_value=1, max_value=21, step=10),
+                                     input_shape=[None, 1],
+                                     activation="relu",
+                                     return_sequences=True),
+    keras.layers.Dense(1)
+    ])
+    model.compile(loss="mse", optimizer="adam", metrics=['mse', 'mae'])
     return model
 
+tuner = RandomSearch(
+    RNN_model,
+    objective='loss',
+    max_trials=30,
+    executions_per_trial=1,
+    directory='Tensor_Flow_Models/RNN_test/keras_tuner',
+    project_name=time.strftime(f"run_%Y_%m_%d-%H_%M_%S.h5")
+)
 
-keras_reg = keras.wrappers.scikit_learn.KerasRegressor(build_model)
-tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
-checkpoint_cb = keras.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
-earlystopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
+tuner.search_space_summary()
 
-from sklearn.model_selection import RandomizedSearchCV
+tuner.search(X_train, y_train,
+             epochs=20,
+             validation_data=(X_valid, y_valid),
+             callbacks=[
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+             ])
 
-param_distribs = {
-    "n_hidden": [3],
-    "n_neurons": [118],
-    "learning_rate": [0.0001],
-    "l2_reg": [0.00001],
-}
+# Show the best models, their hyperparameters, and the resulting metrics.
+tuner.results_summary()
 
-rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=1, cv=2)
-rnd_search_cv.fit(X_train, y_train, epochs=200, validation_data=(X_valid, y_valid),
-                  callbacks=[earlystopping, tensorboard_cb, checkpoint_cb])
-
-print(rnd_search_cv.best_params_)
-print(rnd_search_cv.best_score_)
-model = rnd_search_cv.best_estimator_.model
-history = model.history
-
-"""""
-
-tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
-checkpoint_cb = keras.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
-earlystopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
-optimizer = keras.optimizers.SGD
-
-model = keras.models.Sequential()
-model.add(keras.layers.simpleRNN(128, activation="relu", kernel_initializer="he_normal", input_shape=[None, 40]))
-model.compile(loss="mean_squared_error", optimizer=optimizer)
-
-history = model.fit(X_train, y_train,
-                    epochs=200,
-                    validation_data=(X_valid, y_valid),
-                    validation_steps=3,
-                    callbacks=[earlystopping, tensorboard_cb, checkpoint_cb],
-                    batch_size=32
-                    )
-
-
-mse_test = model.evaluate(X_test, y_test)
-
-
-pd.DataFrame(history.history).plot(figsize=(8, 5))
-plt.show()
-
-model_trained = model
-# keras.models.load_model("Tensor_Flow_Models/models/MLP_run_2019_06_10-11_12_00.h5")
-y_MLP_prediction = model_trained.predict(X_test)
-MLP_mse = mean_squared_error(y_test, y_MLP_prediction)
-MLP_rmse = np.sqrt(MLP_mse)
-
-# convert periods to days
-days = np.arange(len(y_MLP_prediction))/48
-max_days = 10*48
-
-# Plot data on one graph.
-plt.rcParams["figure.figsize"] = (30, 10)
-plt.plot(days[:max_days], y_test.values[:max_days], color='k', linewidth=2, linestyle='dashed')
-plt.plot(days[:max_days], y_MLP_prediction[:max_days], color='b')
-plt.xlabel('Days')
-plt.ylabel('NIV')
-plt.title('MLP Model')
-plt.show()
+# Retrieve the best model.
+best_model = tuner.get_best_models(num_models=1)[0]

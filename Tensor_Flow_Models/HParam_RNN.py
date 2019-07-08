@@ -200,13 +200,13 @@ def get_run_logdir(name):
 
 def get_run_modeldir(name):
     import time
-    run_id = time.strftime(f"{name}_run_%Y_%m_%d-%H_%M_%S.h5")
+    run_id = time.strftime(f"run_{name}_%Y_%m_%d-%H_%M_%S.h5")
     return os.path.join(root_modeldir, run_id)
 
 
 def get_run_hyperdir(name):
     import time
-    run_id = time.strftime(f"run_{name}_{parameters}_%Y_%m_%d-%H_%M_%S")
+    run_id = time.strftime(f"run_{name}_{parameters}")
     return os.path.join(root_hyperdir, run_id)
 
 
