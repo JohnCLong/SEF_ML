@@ -226,13 +226,13 @@ def build_model(n_hidden=3, n_neurons=30, learning_rate=0.001, input_shape=[40, 
 
 
 keras_reg = keras.wrappers.scikit_learn.KerasRegressor(build_model)
-tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
+tensorboard_cb = keras.callbacks.TensorBoard(run_logdir, histogram_freq= 10)
 checkpoint_cb = keras.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
 
 from sklearn.model_selection import RandomizedSearchCV
 
 param_distribs = {
-    "n_hidden": [],
+    "n_hidden": [2],
     "n_neurons": [1,200,5],
     "learning_rate": [0.001, 0.0001],
     "l2_reg": [0.00001],
