@@ -251,17 +251,17 @@ model = rnd_search_cv.best_estimator_.model
 history = model.history
 """""
 
-model = keras.models.Sequential([
-    keras.layers.Dense(30, activation="relu", kernel_initializer="he_normal", input_shape=[len(X_train.keys())],
-                       kernel_regularizer=keras.regularizers.l2(0.01)),
-    keras.layers.Dense(64, activation="relu", kernel_initializer="he_normal",
-                       kernel_regularizer=keras.regularizers.l2(0.01)),
-    keras.layers.Dense(30, activation="relu", kernel_initializer="he_normal",
-                       kernel_regularizer=keras.regularizers.l2(0.01)),
-    keras.layers.Dense(1)
+model = keras_tuner.models.Sequential([
+    keras_tuner.layers.Dense(30, activation="relu", kernel_initializer="he_normal", input_shape=[len(X_train.keys())],
+                       kernel_regularizer=keras_tuner.regularizers.l2(0.01)),
+    keras_tuner.layers.Dense(64, activation="relu", kernel_initializer="he_normal",
+                       kernel_regularizer=keras_tuner.regularizers.l2(0.01)),
+    keras_tuner.layers.Dense(30, activation="relu", kernel_initializer="he_normal",
+                       kernel_regularizer=keras_tuner.regularizers.l2(0.01)),
+    keras_tuner.layers.Dense(1)
 ])
 
-optimizer = tf.keras.optimizers.Nadam
+optimizer = tf.keras_tuner.optimizers.Nadam
 model.compile(loss="mean_squared_error", optimizer=optimizer)
 history = model.fit(X_train, y_train, epochs=200, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
 
@@ -273,7 +273,7 @@ pd.DataFrame(history.history).plot(figsize=(8, 5))
 plt.show()
 
 model_trained = model
-# keras.models.load_model("Tensor_Flow_Models/models/MLP_run_2019_06_10-11_12_00.h5")
+# keras_tuner.models.load_model("Tensor_Flow_Models/models/MLP_run_2019_06_10-11_12_00.h5")
 y_MLP_prediction = model_trained.predict(X_test)
 MLP_mse = mean_squared_error(y_test, y_MLP_prediction)
 MLP_rmse = np.sqrt(MLP_mse)

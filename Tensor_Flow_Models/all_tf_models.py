@@ -264,7 +264,7 @@ layer_5 = 411
 
 run_logdir = get_run_logdir(f"{layer_1}_{layer_2}_DRNN")
 model_dir = get_run_modeldir(f"{layer_1}_{layer_2}_DRNN")
-tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
+tensorboard_cb = keras.callbacks.TensorBoard(run_logdir, histogram_freq=2)
 checkpoint_cb = keras.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
 DRNN_model = keras.models.Sequential([
     keras.layers.SimpleRNN(layer_1, return_sequences=True, input_shape=[None, 1], activation="relu"),
@@ -280,7 +280,7 @@ DRNN_model = keras.models.Sequential([
 ])
 
 DRNN_model.compile(loss="mse", optimizer="adam")
-DRNN_history = DRNN_model.fit(X_train, y_train, epochs=10, validation_data=(X_valid, y_valid),
+DRNN_history = DRNN_model.fit(X_train, y_train, epochs=50, validation_data=(X_valid, y_valid),
                               callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=10),
                                          tensorboard_cb, checkpoint_cb])
 

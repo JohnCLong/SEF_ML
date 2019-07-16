@@ -146,8 +146,14 @@ processed_targets = processed_targets.loc[processed_targets.index > 2016000000]
 X_train_all = processed_features.loc[processed_features.index < 2018030000, :]
 y_train = processed_targets.loc[processed_targets.index < 2018030000]
 
-X_validate_all = processed_features.loc[processed_features.index > 2018030000, :]
-y_validate = processed_targets.loc[processed_targets.index > 2018030000]
+X_validate_all = processed_features.loc[processed_features.index < 2018030000, :]
+y_validate = processed_targets.loc[processed_features.index < 2018030000]
+
+#X_validate_all = processed_features.loc[ 2018030000: 2018090000, :]
+#y_validate = processed_targets.loc[ 2018030000  : 2018090000]
+
+#X_test_all = processed_features.loc[processed_features.index > 2018090000, :]
+#y_test = processed_targets.loc[processed_targets.index > 2018090000]
 
 # Normalize the validation data and separate into X and y variables data frames.
 cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice',
@@ -226,29 +232,43 @@ lin_scores = cross_val_score(lin, X_train, y_train, scoring="neg_mean_squared_er
 lin_rmse_scores = np.sqrt(-lin_scores)
 print("Linear Regression Model")
 display_scores(lin_rmse_scores)
+print(lin_rme)
 
 lass_scores = cross_val_score(lass, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
 lass_rmse_scores = np.sqrt(-lass_scores)
 print("LASSO Model")
 display_scores(lass_rmse_scores)
+print(lass_rme)
 
 ela_scores = cross_val_score(ela, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
 ela_rmse_scores = np.sqrt(-ela_scores)
 print("Elastic Net Model")
 display_scores(ela_rmse_scores)
+print(ela_rme)
 
 random_forest_scores = cross_val_score(forest_reg, X_train, y_train, scoring="neg_mean_squared_error", cv=10)
 random_forest_rmse_scores = np.sqrt(-random_forest_scores)
 print("Random Forests Model")
 display_scores(random_forest_rmse_scores)
+print(random_forest_rme)
 
 print()
+print("cross validatiion scores")
 print("Static model RME = " + str(round(static_rmse, 2)) + 'MWh')
+print("Lasso model RME = " + str(round(np.mean(lass_rme), 2)) + 'MWh')
+print("Elastic Net model RME = " + str(round(np.mean(ela_rme), 2)) + 'MWh')
+print("Linear Regression model RME = " + str(round(np.mean(lin_rme), 2)) + 'MWh')
+print("Random Forest model RME = " + str(round(np.mean(random_forest_rme), 2)) + 'MWh')
+print()
+print("==============================================================")
+print()
+print("cross validatiion scores")
+print("Static model RME = " + str(round(static_mse, 2)) + 'MWh')
 print("Lasso model RME = " + str(round(np.mean(lass_rmse_scores), 2)) + 'MWh')
 print("Elastic Net model RME = " + str(round(np.mean(ela_rmse_scores), 2)) + 'MWh')
 print("Linear Regression model RME = " + str(round(np.mean(lin_rmse_scores), 2)) + 'MWh')
 print("Random Forest model RME = " + str(round(np.mean(random_forest_rmse_scores), 2)) + 'MWh')
-
+print()
 # convert periods to days
 days = np.arange(len(y_ela_prediction))/48
 max_days = 10*48
@@ -276,3 +296,4 @@ for y_data, l in zip(model, name):
     plt.ylabel('NIV')
     plt.title(l)
     plt.show()
+

@@ -172,14 +172,18 @@ def plot_learning_curves(loss, val_loss):
 
 [processed_features, processed_targets] = preprocess_features(raw_data)
 # ----------------------------------------------------------------------------------------------------------------------
-series = processed_targets[4:].values.reshape(929,55)
-series = series[..., np.newaxis].astype(np.float32)
+feature_series = processed_features[4:].values.reshape(929,55,41)
+#feature_series = feature_series[..., np.newaxis].astype(np.float32)
+target_series = processed_targets[4:].values.reshape(929,55)
+#target_series = target_series[..., np.newaxis].astype(np.float32)
+
 n_steps = 54
-X_train, y_train = series[:729, :n_steps], series[:729, -1]
-X_valid, y_valid = series[729:829, :n_steps], series[729:829, -1]
-X_test, y_test = series[829:, :n_steps], series[829:, -1]
+X_train, y_train = feature_series[:729, :n_steps, :], target_series[:729, -1]
+X_valid, y_valid = feature_series[729:829, :n_steps, :], target_series[729:829, -1]
+X_test, y_test = feature_series[829:, :n_steps, :], target_series[829:, -1]
 
 # ----------------------------------------------------------------------------------------------------------------------
+"""
 fig, axes = plt.subplots(nrows=1, ncols=3, sharey=True, figsize=(12, 4))
 for col in range(3):
     plt.sca(axes[col])
@@ -187,11 +191,12 @@ for col in range(3):
                 y_label=("$x(t)$" if col == 0 else None))
 #plt.show()
 
-y_pred = X_valid[:, -1]
-naive_loss = np.mean(keras.losses.mean_squared_error(y_valid, y_pred))
+y_pred = target_series[729:829, -2]
+naive_loss = np.mean(keras_tuner.losses.mean_squared_error(y_valid, y_pred))
 
 plot_series(X_valid[0, :, 0], y_valid[0, 0], y_pred[0, 0])
 #plt.show()
+"""
 # ----------------------------------------------------------------------------------------------------------------------
 root_logdir = os.path.join(".", "Tensor_Flow_Models/RNN_test/my_logs")
 root_modeldir = os.path.join(".", "Tensor_Flow_Models/RNN_test/models")
@@ -228,14 +233,14 @@ hp = HyperParameters()
 
 def RNN_model(hp):
     model = keras.models.Sequential()
-    for i in range(hp.Range('num_layers', 0, 10)):
-        model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i), min_value=1, max_value=501, step=10),
-                                         input_shape=[None, 1],
+    for i in range(hp.Range('num_layers', 0, 5)):
+        model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i), min_value=1, max_value=201, step=10),
+                                         input_shape=[54, 41],
                                          activation="relu",
                                          return_sequences=True))
         model.add(keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.01, 0.1, 0.4, 0.6], default=0)))
-    model.add(keras.layers.SimpleRNN(units=hp.Range('units_last', min_value=1, max_value=501, step=10),
-                                     input_shape=[None, 1],
+    model.add(keras.layers.SimpleRNN(units=hp.Range('units_last', min_value=1, max_value=201, step=10),
+                                     input_shape=[54, 41],
                                      activation="relu"))
     model.add(keras.layers.Dense(1))
     model.compile(loss="mse", optimizer="adam", metrics=['mse', 'mae'])
@@ -245,14 +250,14 @@ def RNN_model(hp):
 tuner = RandomSearch(
     RNN_model,
     objective='loss',
-    max_trials=50,
-    executions_per_trial=3,
+    max_trials=20,
+    executions_per_trial=1,
     directory='Tensor_Flow_Models/RNN_test/keras_tuner',
     project_name=time.strftime(f"run_%Y_%m_%d-%H_%M_%S")
 )
 
 tuner.search_space_summary()
-epoch = 100
+epoch = 50
 tuner.search(X_train, y_train,
              epochs=epoch,
              validation_data=(X_valid, y_valid),

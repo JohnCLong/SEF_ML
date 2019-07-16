@@ -222,12 +222,12 @@ def build_model(n_hidden=3, n_neurons=128, learning_rate=0.001, input_shape=(40,
     options = {"kernel_regularizer": keras.regularizers.l2(l2_reg)}
 
     for layer in range(n_hidden):
-        model.add(keras.layers.LSTM(n_neurons, activation="relu", kernel_initializer="he_normal", return_sequences=True,
+        model.add(keras.layers.SimpleRNN(n_neurons, activation="relu", kernel_initializer="he_normal", return_sequences=True,
                                     **inpt_options, **options))
         model.add(keras.layers.Dropout(0.2))
         inpt_options = {}
 
-    model.add(keras.layers.LSTM(n_neurons, activation="relu", kernel_initializer="he_normal", **inpt_options, **options))
+    model.add(keras.layers.SimpleRNN(n_neurons, activation="relu", kernel_initializer="he_normal", **inpt_options, **options))
     model.add(keras.layers.Dense(1, **inpt_options))
     optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
     model.compile(loss="mean_squared_error", optimizer=optimizer)
@@ -259,13 +259,13 @@ history = model.history
 
 """""
 
-tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
-checkpoint_cb = keras.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
-earlystopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
-optimizer = keras.optimizers.SGD
+tensorboard_cb = keras_tuner.callbacks.TensorBoard(run_logdir)
+checkpoint_cb = keras_tuner.callbacks.ModelCheckpoint(model_dir, save_best_only=True)
+earlystopping = keras_tuner.callbacks.EarlyStopping(monitor='val_loss', patience=10)
+optimizer = keras_tuner.optimizers.SGD
 
-model = keras.models.Sequential()
-model.add(keras.layers.simpleRNN(128, activation="relu", kernel_initializer="he_normal", input_shape=[None, 40]))
+model = keras_tuner.models.Sequential()
+model.add(keras_tuner.layers.simpleRNN(128, activation="relu", kernel_initializer="he_normal", input_shape=[None, 40]))
 model.compile(loss="mean_squared_error", optimizer=optimizer)
 
 history = model.fit(X_train, y_train,
@@ -284,7 +284,7 @@ pd.DataFrame(history.history).plot(figsize=(8, 5))
 plt.show()
 
 model_trained = model
-# keras.models.load_model("Tensor_Flow_Models/models/MLP_run_2019_06_10-11_12_00.h5")
+# keras_tuner.models.load_model("Tensor_Flow_Models/models/MLP_run_2019_06_10-11_12_00.h5")
 y_MLP_prediction = model_trained.predict(X_test)
 MLP_mse = mean_squared_error(y_test, y_MLP_prediction)
 MLP_rmse = np.sqrt(MLP_mse)

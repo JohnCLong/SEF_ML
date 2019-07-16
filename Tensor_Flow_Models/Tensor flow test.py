@@ -2,10 +2,27 @@ import pandas as pd
 import numpy as np
 import os
 import tensorflow as tf
+from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
+import time
+from tensorboard.plugins.hparams import api as hyp
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
+from tensorflow import keras
+from kerastuner.tuners import RandomSearch
+from kerastuner.engine.hyperparameters import HyperParameters
+
+mpl.rc('axes', labelsize=14)
+mpl.rc('xtick', labelsize=12)
+mpl.rc('ytick', labelsize=12)
+
+np.random.seed(42)
+tf.random.set_seed(42)
 
 # import data form csv files
 generation_per_type = pd.read_csv('SEF-ML/data/actual_aggregated_generation_per_type.csv')
@@ -92,6 +109,7 @@ def preprocess_features(raw_data):
 
     # Separate targets and features.
     processed_target = processed_features['indicativeNetImbalanceVolume'].copy()
+    processed_target = processed_target.shift(-2).fillna(0)
 
     # Create a synthetic features.
     processed_features.loc[:, 'RenewablePrediction'] = (processed_features.loc[:, 'solar'] +
@@ -99,103 +117,112 @@ def preprocess_features(raw_data):
                                                         renewable_generation_forecast.loc[:, 'wind_on'])
     processed_features['Val_Diff'] = processed_features['initialWindForecast'] \
                                      - processed_features['latestWindForecast']
+
     processed_features['Solar_Frac'] = processed_features['solar'] / processed_features['quantity']
+
     processed_features['Wind_Frac'] = (processed_features['wind_off'] + processed_features['wind_on'])\
                                       / processed_features['quantity']
+
     processed_features['Renewable_Frac'] = processed_features['RenewablePrediction'] / processed_features['quantity']
-    processed_features.indicativeNetImbalanceVolume = processed_features.indicativeNetImbalanceVolume.shift(2)
-    processed_features.indicativeNetImbalanceVolume = processed_features.indicativeNetImbalanceVolume.fillna(0)
+
+    processed_features["NIV_shift_1hr"] = processed_target.shift(2).fillna(processed_target.mean())
+
+    processed_features["NIV_shift_4hr"] = processed_target.shift(8).fillna(processed_target.mean())
 
     # Rename columns
     processed_target = processed_target.rename("NIV")
     processed_features.rename({'quantity': 'Generation', 'systemBuyPrice': 'ImbalancePrice',
-                               'indicativeNetImbalanceVolume': 'Shift_NIV'}, axis='columns', inplace=True)
+                               'indicativeNetImbalanceVolume': 'NIV_Gate_Closure'}, axis='columns', inplace=True)
 
     return processed_features, processed_target
 
 
 def log_normalize(series):
-  return series.apply(lambda x: np.log(x+1.0))
+    return series.apply(lambda x: np.log(x+1.0))
 
 
 def clip(series, clip_to_min, clip_to_max):
-  return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
+    return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
+
+def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$"):
+    plt.plot(series, ".-")
+    if y is not None:
+        plt.plot(n_steps, y, "bx", markersize=10)
+    if y_pred is not None:
+        plt.plot(n_steps, y_pred, "ro")
+    plt.grid(True)
+    if x_label:
+        plt.xlabel(x_label, fontsize=16)
+    if y_label:
+        plt.ylabel(y_label, fontsize=16, rotation=0)
+    plt.hlines(0, 0, 100, linewidth=1)
+    plt.axis([0, n_steps + 1, -1250, 1000])
+
+def plot_prediction(y,y_pred, x_label="$t$", y_label="$x(t)$", size=[18, 10], dir=None ):
+    plt.figure(figsize=size)
+    plt.plot(y, color="k")
+    plt.plot(y_pred, "--",  color="k")
+    plt.xlabel(x_label, fontsize=16)
+    plt.ylabel(y_label, fontsize=16, rotation=0)
+    plt.hlines(0, 0, 100, linewidth=1)
+    if dir:
+        plt.savefig(dir)
+        print("saving picture...")
+
+def plot_learning_curves(loss, val_loss):
+    plt.plot(np.arange(len(loss)) + 0.5, loss, "b.-", label="Training loss")
+    plt.plot(np.arange(len(val_loss)) + 1, val_loss, "r.-", label="Validation loss")
+    plt.gca().xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+#    plt.axis([1, 20, 0, 0.05])
+    plt.legend(fontsize=14)
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.grid(True)
 
 
 [processed_features, processed_targets] = preprocess_features(raw_data)
-processed_features_copy = processed_features.copy()
-
-processed_features['APXPrice'] = clip(processed_features['APXPrice'], 0, 200)
-processed_features['Biomass'] = clip(processed_features['Biomass'], 0, 4000)
-processed_features['Nuclear'] = clip(processed_features['Nuclear'], 4000, 10000)
-processed_features['OffWind'] = clip(processed_features['OffWind'], 0, 5000)
-processed_features['OffWind'] = clip(processed_features['OffWind'], 0, 11000)
-processed_features['ImbalancePrice'] = clip(processed_features['ImbalancePrice'], -100, 250)
-
-processed_features['FossilHardCoal'] = log_normalize(processed_features['FossilHardCoal'])
-processed_features['HydroPumpedStorage'] = log_normalize(processed_features['HydroPumpedStorage'])
-processed_features['HydroRunOfRiver'] = log_normalize(processed_features['HydroRunOfRiver'])
-processed_features['solar'] = log_normalize(processed_features['solar'])
-processed_features['Other'] = log_normalize(processed_features['Other'])
-
 # ----------------------------------------------------------------------------------------------------------------------
-# calculate the correlation matrix, isolate the NIV correlations and then order by the abs value (descending)
-
-processed_test_features = processed_features.loc[processed_features.index < 2016500000, :]
-processed_test_targets = processed_targets.loc[processed_targets.index < 2016500000]/100
-
-processed_features = processed_features.loc[processed_features.index > 2016500000, :]
-processed_targets = processed_targets.loc[processed_targets.index > 2016500000]/100
-
-X_train_all = processed_features.loc[processed_features.index < 2018030000, :]
-y_train = processed_targets.loc[processed_targets.index < 2018030000]
-
-X_valid_all = processed_features.loc[processed_features.index > 2018030000, :]
-y_valid = processed_targets.loc[processed_targets.index > 2018030000]
-
-# Normalize the validation data and separate into X and y variables data frames.
-cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice',
-      'Biomass', 'Other', 'wind_off', 'initialWindForecast', 'Wind_Frac', 'Val_Diff', ]
-
-X_train = X_train_all.loc[:, cols_all]
-X_train_mean = X_train.mean()
-X_train_std = X_train.std()
-X_train = (X_train - X_train_mean) / X_train_std
-
-X_valid = X_valid_all.loc[:, cols_all]
-X_valid = (X_valid-X_train_mean)/X_train_std
-
-X_test = processed_test_features.loc[:, cols_all]
-X_test = (X_test-X_train_mean)/X_train_std
-
-y_test = processed_test_targets
-# ----------------------------------------------------------------------------------------------------------------------
-# build MLP model
-root_logdir = os.path.join(os.curdir, "my_logs")
+columns = ['NIV_Gate_Closure', 'ImbalancePrice', 'solar', 'wind_off']
+targets = processed_targets.values
+features = processed_features.loc[:,columns ].values
+#features = features.reshape((len(features), 1))
+targets = targets.reshape((len(targets), 1))
+train_data = TimeseriesGenerator(features, targets, 50, batch_size=32,
+                                 start_index=1196*32, end_index=1446*32)
+valid_data = TimeseriesGenerator(features, targets, 50, batch_size=32,
+                                 start_index=1446*32, end_index=1496*32)
+test_data = TimeseriesGenerator(features, targets, 50, batch_size=32,
+                                start_index=1496*32, end_index=1596*32)
 
 
-def get_run_logdir():
-    import time
-    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
-    return os.path.join(root_logdir, run_id)
+#train_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
+#                                 start_index=750*32, end_index=996*32)
+#valid_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
+#                                 start_index=996*32, end_index=1296*32)
+#test_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
+#                                start_index=1296*32, end_index=1596*32)
 
 
-run_logdir = get_run_logdir()
-
-model = keras.models.Sequential([
-    keras.layers.Dense(30, activation="relu", input_shape=[len(X_train.keys())]),
-    keras.layers.Dense(64, activation='relu'),
-    keras.layers.Dense(30, activation='relu'),
-    keras.layers.Dense(1)
+model = keras.models.Sequential()
+model.add(keras.layers.SimpleRNN(units=200, input_shape=[50, len(columns)], activation="relu", return_sequences=True))
+model.add(keras.layers.Dropout(0.3))
+model.add(keras.layers.SimpleRNN(units=100, input_shape=[50, len(columns)], activation="relu", return_sequences=True))
+model.add(keras.layers.Dropout(0.3))
+model.add(keras.layers.SimpleRNN(units=50, input_shape=[50, len(columns)], activation="relu", return_sequences=False))
+model.add(keras.layers.Dense(1))
+model.compile(loss="mse", optimizer="adam", metrics=['mse', 'mae'])
+model.fit(train_data, epochs=100, validation_data=(valid_data), callbacks=[
+    tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5),
 ])
 
-optimizer = tf.keras.optimizers.RMSprop(0.001)
-model.compile(loss="mse", optimizer=optimizer)
+score = model.evaluate(test_data)
+y_pred = model.predict(test_data)
 
-tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
-history = model.fit(X_train, y_train, epochs=10, validation_data=(X_valid, y_valid), callbacks=[tensorboard_cb])
-
-mse_test = model.evaluate(X_test, y_test)
-
-pd.DataFrame(history.history).plot(figsize=(8, 5))
+y_test=test_data.targets[1296*32+50:1596*32+50]
+plt.figure(figsize=[30,10])
+plt.plot(y_test[:100], color="k", label='NIV')
+plt.plot(y_pred[:100], "--", color="k",  label='Prediction')
+plt.xlabel('time step', fontsize=16)
+plt.ylabel('NIV', fontsize=16, rotation=0)
+plt.legend
 plt.show()
