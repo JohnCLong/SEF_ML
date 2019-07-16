@@ -93,7 +93,6 @@ raw_data = pd.concat([generation_per_type, apx_price, renewable_generation_forec
                       initial_demand_outturn, interconnectors, loss_of_load_probability,
                       market_index_data, wind_generation_forecast_and_outturn], axis=1, sort=True)
 
-
 def preprocess_features(raw_data):
     """Prepares input features from California housing data set.
 
@@ -122,11 +121,13 @@ def preprocess_features(raw_data):
     processed_features['reserveScarcityPrice'].fillna(0, inplace=True)
     processed_features['drm2HourForecast'].fillna(processed_features['drm2HourForecast'].mean(), inplace=True)
     processed_features['lolp1HourForecast'].fillna(0, inplace=True)
+    processed_features.dropna(inplace=True)
 
 
 
     # Separate targets and features.
     processed_target = processed_features['indicativeNetImbalanceVolume'].copy()
+    processed_target = processed_target.shift(-2).fillna(0)
 
     # Create a synthetic features.
     processed_features.loc[:, 'RenewablePrediction'] = (processed_features.loc[:, 'solar'] +
@@ -134,20 +135,25 @@ def preprocess_features(raw_data):
                                                         renewable_generation_forecast.loc[:, 'wind_on'])
     processed_features['Val_Diff'] = processed_features['initialWindForecast'] \
                                      - processed_features['latestWindForecast']
+
     processed_features['Solar_Frac'] = processed_features['solar'] / processed_features['quantity']
-    processed_features['Wind_Frac'] = (processed_features['wind_off'] + processed_features['wind_on'] )\
+
+    processed_features['Wind_Frac'] = (processed_features['wind_off'] + processed_features['wind_on'])\
                                       / processed_features['quantity']
+
     processed_features['Renewable_Frac'] = processed_features['RenewablePrediction'] / processed_features['quantity']
 
-    # Drop all NaN values, this drops
-    processed_features.dropna(inplace=True)
+    processed_features["NIV_shift_1hr"] = processed_target.shift(4).fillna(processed_target.mean())
+
+    processed_features["NIV_shift_4hr"] = processed_target.shift(10).fillna(processed_target.mean())
 
     # Rename columns
     processed_target = processed_target.rename("NIV")
     processed_features.rename({'quantity': 'Generation', 'systemBuyPrice': 'ImbalancePrice',
-                               'indicativeNetImbalanceVolume': 'NIV'}, axis='columns', inplace=True)
+                               'indicativeNetImbalanceVolume': 'NIV_Gate_closure'}, axis='columns', inplace=True)
 
     return processed_features, processed_target
+
 
 
 
@@ -183,14 +189,16 @@ processed_features = processed_features.loc[processed_features.index > 201600000
 train = processed_features.loc[processed_features.index < 2018030000, :]
 validate = processed_features.loc[processed_features.index > 2018030000, :]
 
-correlation_matrix = processed_features.corr()
+all = processed_features
+all['NIV'] = processed_targets
+correlation_matrix = all.corr()
 cm_NIV = correlation_matrix['NIV']
 cm_NIV = cm_NIV.reindex(cm_NIV.abs().sort_values(ascending=False).index)
 # create a new list of the two 5 most correlated values (starting at 1 as list_of_attributes[0] = 'NIV'
 list_of_rows = cm_NIV.index.values
-features = list_of_rows[0:10]
+features = list_of_rows[0:20]
 
-correlation_features = processed_features[features].corr()
+correlation_features = all[features].corr()
 print(correlation_features)
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -202,7 +210,7 @@ scatter_matrix(processed_features[features[0:4]], figsize=(20, 18), diagonal='kd
 # plt.savefig('pictures/Data Exploration/Scatter_Matrix.png')
 plt.show()
 
-for xcol in features[1:]:
-    plot_scatter(processed_features, xcol, 'NIV')
+#for xcol in features[1:]:
+ #   plot_scatter(processed_features, xcol, 'NIV')
 
 
