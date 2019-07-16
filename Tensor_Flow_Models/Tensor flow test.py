@@ -105,8 +105,6 @@ def preprocess_features(raw_data):
     processed_features['lolp1HourForecast'].fillna(0, inplace=True)
     processed_features.dropna(inplace=True)
 
-
-
     # Separate targets and features.
     processed_target = processed_features['indicativeNetImbalanceVolume'].copy()
     processed_target = processed_target.shift(-2).fillna(0)
@@ -137,6 +135,12 @@ def preprocess_features(raw_data):
     return processed_features, processed_target
 
 
+def get_run_logdir(name):
+    import time
+    run_id = time.strftime(f"{name}_run-_%Y_%m_%d-%H_%M_%S")
+    return os.path.join(root_logdir, run_id)
+
+
 def log_normalize(series):
     return series.apply(lambda x: np.log(x+1.0))
 
@@ -144,7 +148,8 @@ def log_normalize(series):
 def clip(series, clip_to_min, clip_to_max):
     return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
 
-def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$"):
+
+def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$", n_steps=54):
     plt.plot(series, ".-")
     if y is not None:
         plt.plot(n_steps, y, "bx", markersize=10)
@@ -158,7 +163,8 @@ def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$"):
     plt.hlines(0, 0, 100, linewidth=1)
     plt.axis([0, n_steps + 1, -1250, 1000])
 
-def plot_prediction(y,y_pred, x_label="$t$", y_label="$x(t)$", size=[18, 10], dir=None ):
+
+def plot_prediction(y, y_pred, x_label="$t$", y_label="$x(t)$", size=[18, 10], dir=None ):
     plt.figure(figsize=size)
     plt.plot(y, color="k")
     plt.plot(y_pred, "--",  color="k")
@@ -182,44 +188,48 @@ def plot_learning_curves(loss, val_loss):
 
 [processed_features, processed_targets] = preprocess_features(raw_data)
 # ----------------------------------------------------------------------------------------------------------------------
-columns = ['NIV_Gate_Closure', 'ImbalancePrice', 'solar', 'wind_off']
+columns = ['NIV_Gate_Closure', 'ImbalancePrice']
 targets = processed_targets.values
-features = processed_features.loc[:,columns ].values
-#features = features.reshape((len(features), 1))
+features = processed_features.loc[:, columns].values
+if features.shape[1] == 1:
+    features = features.reshape((len(features), 1))
 targets = targets.reshape((len(targets), 1))
-train_data = TimeseriesGenerator(features, targets, 50, batch_size=32,
+sequence = 100
+
+train_data = TimeseriesGenerator(features, targets, sequence, batch_size=32,
                                  start_index=1196*32, end_index=1446*32)
-valid_data = TimeseriesGenerator(features, targets, 50, batch_size=32,
+valid_data = TimeseriesGenerator(features, targets, sequence, batch_size=32,
                                  start_index=1446*32, end_index=1496*32)
-test_data = TimeseriesGenerator(features, targets, 50, batch_size=32,
+test_data = TimeseriesGenerator(features, targets, sequence, batch_size=32,
                                 start_index=1496*32, end_index=1596*32)
 
 
-#train_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
+# train_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
 #                                 start_index=750*32, end_index=996*32)
-#valid_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
+# valid_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
 #                                 start_index=996*32, end_index=1296*32)
-#test_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
+# test_data = TimeseriesGenerator(processed_targets, processed_targets, 50, batch_size=32,
 #                                start_index=1296*32, end_index=1596*32)
-
+root_logdir = 'Tensor_Flow_Models/testing_log_dump'
 
 model = keras.models.Sequential()
-model.add(keras.layers.SimpleRNN(units=200, input_shape=[50, len(columns)], activation="relu", return_sequences=True))
-model.add(keras.layers.Dropout(0.3))
-model.add(keras.layers.SimpleRNN(units=100, input_shape=[50, len(columns)], activation="relu", return_sequences=True))
-model.add(keras.layers.Dropout(0.3))
-model.add(keras.layers.SimpleRNN(units=50, input_shape=[50, len(columns)], activation="relu", return_sequences=False))
+# model.add(keras.layers.LSTM(units=20, input_shape=[50, len(columns)], activation="relu", return_sequences=True))
+# model.add(keras.layers.Dropout(0.5))
+model.add(keras.layers.LSTM(units=10, input_shape=[sequence, len(columns)], activation="tanh", return_sequences=True))
+model.add(keras.layers.Dropout(0.1))
+model.add(keras.layers.LSTM(units=10, input_shape=[sequence, len(columns)], activation="tanh", return_sequences=False))
 model.add(keras.layers.Dense(1))
-model.compile(loss="mse", optimizer="adam", metrics=['mse', 'mae'])
-model.fit(train_data, epochs=100, validation_data=(valid_data), callbacks=[
+model.compile(loss="mae", optimizer="adam", metrics=["mse", 'mae'])
+model.fit(train_data, epochs=100, validation_data=valid_data, callbacks=[
     tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5),
+    tf.keras.callbacks.TensorBoard(get_run_logdir(columns), profile_batch=0)
 ])
 
 score = model.evaluate(test_data)
 y_pred = model.predict(test_data)
 
-y_test=test_data.targets[1296*32+50:1596*32+50]
-plt.figure(figsize=[30,10])
+y_test = test_data.targets[1296*32+50:1596*32+50]
+plt.figure(figsize=[30, 10])
 plt.plot(y_test[:100], color="k", label='NIV')
 plt.plot(y_pred[:100], "--", color="k",  label='Prediction')
 plt.xlabel('time step', fontsize=16)

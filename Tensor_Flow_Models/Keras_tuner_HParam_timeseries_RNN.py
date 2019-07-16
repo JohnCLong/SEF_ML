@@ -90,8 +90,8 @@ def preprocess_features(raw_data):
     processed_features = processed_features.loc[:, ~processed_features.columns.duplicated()]
 
     # Drop unwanted data or fill if applicable
-    indexNames = processed_features[processed_features['quantity'] < 10000].index
-    processed_features.drop(indexNames, inplace=True)
+    index_names = processed_features[processed_features['quantity'] < 10000].index
+    processed_features.drop(index_names, inplace=True)
     processed_features.drop("intnemGeneration", axis=1, inplace=True)
     processed_features.drop('settlementDate', axis=1, inplace=True)
     processed_features.drop('systemSellPrice', axis=1, inplace=True)
@@ -103,8 +103,6 @@ def preprocess_features(raw_data):
     processed_features['drm2HourForecast'].fillna(processed_features['drm2HourForecast'].mean(), inplace=True)
     processed_features['lolp1HourForecast'].fillna(0, inplace=True)
     processed_features.dropna(inplace=True)
-
-
 
     # Separate targets and features.
     processed_target = processed_features['indicativeNetImbalanceVolume'].copy()
@@ -144,6 +142,7 @@ def log_normalize(series):
 def clip(series, clip_to_min, clip_to_max):
     return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
 
+
 def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$"):
     plt.plot(series, ".-")
     if y is not None:
@@ -158,6 +157,7 @@ def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$"):
     plt.hlines(0, 0, 100, linewidth=1)
     plt.axis([0, n_steps + 1, -1250, 1000])
 
+
 def plot_prediction(y,y_pred, x_label="$t$", y_label="$x(t)$", size=[18, 10], dir=None ):
     plt.figure(figsize=size)
     plt.plot(y, color="k")
@@ -168,6 +168,7 @@ def plot_prediction(y,y_pred, x_label="$t$", y_label="$x(t)$", size=[18, 10], di
     if dir:
         plt.savefig(dir)
         print("saving picture...")
+
 
 def plot_learning_curves(loss, val_loss):
     plt.plot(np.arange(len(loss)) + 0.5, loss, "b.-", label="Training loss")
@@ -182,7 +183,7 @@ def plot_learning_curves(loss, val_loss):
 
 [processed_features, processed_targets] = preprocess_features(raw_data)
 # ----------------------------------------------------------------------------------------------------------------------
-series = processed_targets[4:].values.reshape(929,55)
+series = processed_targets[4:].values.reshape(929, 55)
 series = series[..., np.newaxis].astype(np.float32)
 n_steps = 54
 X_train, y_train = series[:729, :n_steps], series[:729, -1]
@@ -195,18 +196,17 @@ for col in range(3):
     plt.sca(axes[col])
     plot_series(X_valid[col, :, 0], y_valid[col, 0],
                 y_label=("$x(t)$" if col == 0 else None))
-#plt.show()
+# plt.show()
 
 y_pred = X_valid[:, -1]
 naive_loss = np.mean(keras.losses.mean_squared_error(y_valid, y_pred))
 
 plot_series(X_valid[0, :, 0], y_valid[0, 0], y_pred[0, 0])
-#plt.show()
+# plt.show()
 # ----------------------------------------------------------------------------------------------------------------------
 root_logdir = os.path.join(".", "Tensor_Flow_Models/Keras_tuner/timeseries_RNN/my_logs")
 root_modeldir = os.path.join(".", "Tensor_Flow_Models/Keras_tuner/timeseries_RNN//models")
 root_hyperdir = os.path.join(".", "Tensor_Flow_Models/Keras_tuner/timeseries_RNN//hyper_param")
-
 
 
 def get_run_logdir(name):
@@ -220,24 +220,29 @@ def get_run_modeldir(name):
     run_id = time.strftime(f"run_{name}_%Y_%m_%d-%H_%M_%S.h5")
     return os.path.join(root_modeldir, run_id)
 
+
 def get_run_picdir(name):
     import time
     run_id = time.strftime(f"{name}.png")
     return os.path.join(root_pictures, run_id)
 
+
 a = 0
 b = 0
+
 
 def get_run_hyperdir(a, b):
     import time
     a = a
     run_id = time.strftime(f"run_{tuner.hyperparameters.values.values()}_epoch_{b}-{a}")
     a += 1
-    if a%epoch ==0:
+    if a % epoch == 0:
         a = 0
-        b +=1
+        b += 1
         return a, b
     return os.path.join(root_hyperdir, run_id), a, b
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 hp = HyperParameters()
 layers_min = 1
@@ -254,7 +259,7 @@ def RNN_model(hp):
     model = keras.models.Sequential()
     for i in range(hp.Range('num_layers', layers_min, layers_max)):
         model.add(keras.layers.SimpleRNN(units=hp.Range('units_' + str(i), min_value=unit_min, max_value=unit_max, step=10),
-                                        input_shape=[None, 1],
+                                         input_shape=[None, 1],
                                          activation="relu",
                                          return_sequences=True))
         model.add(keras.layers.Dropout(hp.Choice('Drop_out', [0, 0.01, 0.1, 0.4, 0.6], default=0)))

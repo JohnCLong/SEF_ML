@@ -114,11 +114,11 @@ def preprocess_features(raw_data):
 
 
 def log_normalize(series):
-  return series.apply(lambda x: np.log(x+1.0))
+    return series.apply(lambda x: np.log(x+1.0))
 
 
 def clip(series, clip_to_min, clip_to_max):
-  return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
+    return series.apply(lambda x: (min(max(x, clip_to_min), clip_to_max)))
 
 
 [processed_features, processed_targets] = preprocess_features(raw_data)
@@ -149,11 +149,11 @@ y_train = processed_targets.loc[processed_targets.index < 2018030000]
 X_validate_all = processed_features.loc[processed_features.index < 2018030000, :]
 y_validate = processed_targets.loc[processed_features.index < 2018030000]
 
-#X_validate_all = processed_features.loc[ 2018030000: 2018090000, :]
-#y_validate = processed_targets.loc[ 2018030000  : 2018090000]
+# X_validate_all = processed_features.loc[ 2018030000: 2018090000, :]
+# y_validate = processed_targets.loc[ 2018030000  : 2018090000]
 
-#X_test_all = processed_features.loc[processed_features.index > 2018090000, :]
-#y_test = processed_targets.loc[processed_targets.index > 2018090000]
+# X_test_all = processed_features.loc[processed_features.index > 2018090000, :]
+# y_test = processed_targets.loc[processed_targets.index > 2018090000]
 
 # Normalize the validation data and separate into X and y variables data frames.
 cols_all = ['ImbalancePrice', 'solar', 'Solar_Frac', 'APXPrice',
@@ -296,4 +296,3 @@ for y_data, l in zip(model, name):
     plt.ylabel('NIV')
     plt.title(l)
     plt.show()
-
